@@ -18,7 +18,6 @@ import {
   ST_POSITION_OFFSET_MAX,
   ST_POSITION_OFFSET_MIN,
   schemaAttributeValue,
-  parseSchemaBoolean,
 } from './ooxml-drawing-rules.ts';
 import {
   createWalkState,
@@ -55,6 +54,7 @@ import { createPackageShapeThemeResolvers } from './theme-color-resolution.ts';
 import {
   findDirectChild,
   parseEmu,
+  schemaFlagIsSet,
   projectTextboxStory,
   projectVectorShape,
   type ShapeSchemeColorResolver,
@@ -965,7 +965,8 @@ function readFrameLocks(node: OoxmlElement | null): DrawingLocksInput {
   const attrs = frameLocks.attributes;
   const locked = (name: string): boolean | undefined => {
     const value = schemaAttributeValue(attrs, name);
-    return value === undefined ? undefined : (parseSchemaBoolean(value) ?? false);
+    if (value === undefined) return undefined;
+    return value === '1' || value === 'true';
   };
   return {
     select: locked('noSelect'),
@@ -1010,7 +1011,7 @@ function readDocPrMetadata(
       name: '',
       title: '',
       description: '',
-      hidden: parseSchemaBoolean(schemaAttributeValue(anchor.attributes, 'hidden')) ?? false,
+      hidden: schemaAttributeValue(anchor.attributes, 'hidden') === '1',
       hyperlinkHref: null,
     });
   }
@@ -1028,8 +1029,8 @@ function readDocPrMetadata(
     title: schemaAttributeValue(docPr.attributes, 'title') ?? '',
     description: schemaAttributeValue(docPr.attributes, 'descr') ?? '',
     hidden:
-      (parseSchemaBoolean(schemaAttributeValue(docPr.attributes, 'hidden')) ?? false) ||
-      (parseSchemaBoolean(schemaAttributeValue(anchor.attributes, 'hidden')) ?? false),
+      schemaAttributeValue(docPr.attributes, 'hidden') === '1' ||
+      schemaAttributeValue(anchor.attributes, 'hidden') === '1',
     hyperlinkHref,
   });
 }
@@ -1156,10 +1157,12 @@ function projectPicture(
     // `xsd:boolean`, so `true` is as legal as `1`; reading only `1` painted a mirrored
     // picture the right way round. A picture flip IS paintable, so a schema-invalid value
     // reads as unset here rather than refusing the whole picture.
-    flipHorizontal:
-      (xfrm ? parseSchemaBoolean(schemaAttributeValue(xfrm.attributes, 'flipH')) : null) ?? false,
-    flipVertical:
-      (xfrm ? parseSchemaBoolean(schemaAttributeValue(xfrm.attributes, 'flipV')) : null) ?? false,
+    flipHorizontal: schemaFlagIsSet(
+      xfrm ? schemaAttributeValue(xfrm.attributes, 'flipH') : undefined
+    ),
+    flipVertical: schemaFlagIsSet(
+      xfrm ? schemaAttributeValue(xfrm.attributes, 'flipV') : undefined
+    ),
     offsetEmu: Object.freeze({
       x: offNode ? (parseEmu(schemaAttributeValue(offNode.attributes, 'x'), false) ?? 0) : 0,
       y: offNode ? (parseEmu(schemaAttributeValue(offNode.attributes, 'y'), false) ?? 0) : 0,
@@ -1466,14 +1469,8 @@ export function projectDrawingWithState(
 
   const metadata = readDocPrMetadata(anchor, compatibilityMode, ctx.resolveRelationship);
   const wrapElement = kind === 'anchored' ? findWrapElement(anchor, compatibilityMode) : null;
-  // CT_Anchor flags are `xsd:boolean`, so `true` is as legal as `1`. The `?? default`
-  // states what an absent or schema-invalid value means: off for these, on for
-  // layoutInCell and allowOverlap below, because dropping a picture's overlap is the
-  // louder mistake.
-  const anchorFlag = (name: string): boolean | null =>
-    parseSchemaBoolean(schemaAttributeValue(anchor.attributes, name));
-  const behindDocument = anchorFlag('behindDoc') ?? false;
-  const simplePosEnabled = anchorFlag('simplePos') ?? false;
+  const behindDocument = schemaAttributeValue(anchor.attributes, 'behindDoc') === '1';
+  const simplePosEnabled = schemaAttributeValue(anchor.attributes, 'simplePos') === '1';
   const framePr =
     findDirectKind(anchor.children, 'drawingGraphicFramePr') ??
     (compatibilityMode
@@ -1482,7 +1479,10 @@ export function projectDrawingWithState(
           localName: 'cNvGraphicFramePr',
         })
       : null);
-  const locks = mergeLocks(anchorFlag('locked') ?? false, readFrameLocks(framePr));
+  const locks = mergeLocks(
+    schemaAttributeValue(anchor.attributes, 'locked') === '1',
+    readFrameLocks(framePr)
+  );
   const pictureResult = projectPicture(anchor, state, ctx, namespaceScope, compatibilityMode);
   if (pictureResult.diagnostic) state.diagnostics.push(pictureResult.diagnostic);
   if (state.refused) {
@@ -1497,8 +1497,8 @@ export function projectDrawingWithState(
           simplePos: simplePosEnabled,
           relativeHeight: parseEmu(schemaAttributeValue(anchor.attributes, 'relativeHeight')) ?? 0,
           behindDocument,
-          layoutInCell: anchorFlag('layoutInCell') ?? true,
-          allowOverlap: anchorFlag('allowOverlap') ?? true,
+          layoutInCell: schemaAttributeValue(anchor.attributes, 'layoutInCell') !== '0',
+          allowOverlap: schemaAttributeValue(anchor.attributes, 'allowOverlap') !== '0',
         })
       : null;
   const vectorShape = pictureResult.picture
