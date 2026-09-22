@@ -238,7 +238,16 @@ export function exclusionZoneFromAnchoredDrawing(options: {
   readonly columnIndex?: number;
   readonly yOverride?: number;
 }): ExclusionZone | null {
-  if (options.drawing.behindDocument) return null;
+  // `behindDoc` is not consulted here: it answers a different question than the wrap
+  // element. `CT_Anchor` requires the attribute and `EG_WrapType` requires exactly one
+  // wrap element, so `behindDoc="1"` beside `wrapSquare` is an ordinary valid pairing,
+  // not a conflict to settle by dropping one. `CT_WrapNone` is empty, so only `behindDoc`
+  // can place a non-wrapping object behind or in front — which is why
+  // `wrapTargetFromAnchor` folds it into the `behind`/`inFront` targets there and only
+  // there, and those are the targets this check already drops. Word and LibreOffice both
+  // flow text around a `wrapSquare`/`wrapTight` float that sets the flag (measured), so
+  // such a float displaces text whatever `behindDoc` reads; it is only painted under the
+  // glyphs, which `paintLayerOf` still decides.
   if (!wrapProducesExclusion(options.drawing.wrap)) return null;
   const y = options.yOverride ?? options.drawing.y;
   const input = wrapExclusionInputForProjection({
@@ -468,7 +477,6 @@ export function synthesizeParagraphWrapExclusionZones(options: {
     // A drawing the display mode resolves away publishes no record, so it must carve no
     // hole either: the original view must not wrap text around an insertion it hides.
     if (!revisionsVisible(atom.revisions, displayMode, options.revisionAuthorFilter)) continue;
-    if (atom.projection.anchor?.behindDocument) continue;
     if (anchoredOutOfCell(atom.projection, options)) continue;
     if (!wrapProducesExclusion(atom.projection.wrap) || atom.projection.wrap === 'topAndBottom')
       continue;
@@ -571,7 +579,7 @@ export function synthesizeParagraphTopAndBottomZones(options: {
   for (const atom of atoms) {
     // Same rule as the wrap zones above: no record, no hole.
     if (!revisionsVisible(atom.revisions, displayMode, options.revisionAuthorFilter)) continue;
-    if (atom.projection.anchor?.behindDocument) continue;
+    // `behindDoc` is not a wrap setting — see `exclusionZoneFromAnchoredDrawing`.
     if (atom.projection.wrap !== 'topAndBottom') continue;
     // The table's rows move below this out-of-cell float instead of the cell text.
     if (

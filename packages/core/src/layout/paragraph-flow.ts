@@ -477,7 +477,8 @@ export function breakParagraph(
     for (const atom of anchoredDrawingAtomsInParagraph(paragraph, flow.inlineDrawingLayout)) {
       if (!revisionsVisible(atom.revisions, anchorDisplayMode, flow?.revisionAuthorFilter))
         continue;
-      if (atom.projection.anchor?.behindDocument) continue;
+      // `behindDoc` is not a wrap setting — see `exclusionZoneFromAnchoredDrawing`. The
+      // wrap check below already covers the `wrapNone` cases it used to stand in for.
       if (
         atom.projection.wrap === 'topAndBottom' ||
         atom.projection.wrap === 'inline' ||

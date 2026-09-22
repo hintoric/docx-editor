@@ -19,9 +19,10 @@ export function hasFurnitureDrawingExclusions(furniture: PageFurniture | undefin
   for (const stories of [furniture.headers, furniture.footers])
     for (const story of stories.values())
       if (
-        story.anchoredDrawings?.some(
-          (d) => !d.behindDocument && !['inline', 'behind', 'inFront'].includes(d.wrap)
-        )
+        // Must agree with `exclusionZoneFromAnchoredDrawing`, which this predicate decides
+        // whether to run at all: `behindDoc` is not consulted, because the wrap target
+        // already carries the `wrapNone` behind/inFront cases.
+        story.anchoredDrawings?.some((d) => !['inline', 'behind', 'inFront'].includes(d.wrap))
       )
         return true;
   return false;
