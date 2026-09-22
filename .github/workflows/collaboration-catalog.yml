@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   capture:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     outputs:
       pr: ${{ steps.capture.outputs.pr }}
@@ -40,7 +40,7 @@ jobs:
           private-key: ${{ secrets.RELEASE_PAL_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: docx-editor
-      - uses: actions/checkout@v7.0.1
+      - uses: useblacksmith/checkout@v1
         with:
           ref: main
           fetch-depth: 0
@@ -106,7 +106,7 @@ jobs:
     name: Merge verified catalog
     needs: capture
     if: needs.capture.outputs.pr != ''
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 40
     permissions:
       contents: read
@@ -118,7 +118,7 @@ jobs:
       PR_NUMBER: ${{ needs.capture.outputs.pr }}
       RELEASE_VERSION: ${{ needs.capture.outputs.version }}
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: useblacksmith/checkout@v1
         with:
           ref: main
           persist-credentials: false

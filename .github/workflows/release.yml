@@ -45,7 +45,7 @@ jobs:
   # config.json are not changesets.
   mode:
     name: Detect release mode
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     permissions:
       contents: read
@@ -53,7 +53,7 @@ jobs:
       publishing: ${{ steps.pending.outputs.publishing }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7.0.1
+        uses: useblacksmith/checkout@v1
 
       - name: Detect pending changesets
         id: pending
@@ -96,7 +96,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v7.0.1
+        uses: useblacksmith/checkout@v1
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -126,7 +126,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v7.0.1
+        uses: useblacksmith/checkout@v1
         with:
           fetch-depth: 0
 
@@ -216,7 +216,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: useblacksmith/checkout@v1
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
@@ -252,7 +252,7 @@ jobs:
     # Run on both paths: checks/build are skipped on the PR-update path by
     # design, so accept skipped as well as success.
     if: ${{ !cancelled() && needs.mode.result == 'success' && (needs.checks.result == 'success' || needs.checks.result == 'skipped') && (needs.build.result == 'success' || needs.build.result == 'skipped') && (needs.mode.outputs.publishing != 'true' || needs.collaboration.result == 'success') }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     outputs:
       # Consumed by the notify-failure job to tell "the changesets step itself
@@ -266,7 +266,7 @@ jobs:
       actions: write # dispatch the Python wheels workflow after npm publishes
     steps:
       - name: Checkout
-        uses: actions/checkout@v7.0.1
+        uses: useblacksmith/checkout@v1
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -428,7 +428,7 @@ jobs:
     name: Notify Slack — workflow failed
     needs: [mode, checks, build, release]
     if: ${{ failure() }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     # Only curls the Slack webhook; needs no GITHUB_TOKEN access at all.
     permissions: {}

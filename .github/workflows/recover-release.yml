@@ -36,7 +36,7 @@ permissions:
 jobs:
   verify:
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     outputs:
       published_packages: ${{ steps.candidate.outputs.packages }}
@@ -45,7 +45,7 @@ jobs:
       SOURCE_RUN_ID: ${{ inputs.source_run_id }}
       RELEASE_VERSION: ${{ inputs.version }}
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: useblacksmith/checkout@v1
         with:
           fetch-depth: 0
       - uses: actions/setup-node@v6
@@ -73,7 +73,7 @@ jobs:
       fail-fast: false
       matrix:
         repository: [docx-editor.dev, docx-to-markdown.com]
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     steps:
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
