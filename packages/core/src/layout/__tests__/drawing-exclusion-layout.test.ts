@@ -883,11 +883,7 @@ describe('header and footer drawing exclusions in body flow', () => {
         for (const span of line.spans) expect(span.box.x).toBeGreaterThanOrEqual(80);
     }
   });
-  // `behindDoc` says which layer the object is painted on, not whether it wraps: Word's
-  // own "Behind Text" is `wrapNone`, and that watermark still leaves the body alone (see
-  // 'body content box is unchanged by tall header watermark'). A header float that
-  // declares a real wrap type displaces body text whatever the flag reads — asserted
-  // against the in-front story so the flag is the only thing that differs.
+  // `behindDoc` changes the paint layer, not the text wrap.
   test('a behind-text header float with a square wrap displaces body text like an in-front one', () => {
     const behind = render(
       body(paragraph('Body')),

@@ -194,12 +194,7 @@ describe('wrapNone behind/inFront produce no exclusion', () => {
     ).toBeNull();
   });
 
-  // `behindDoc` is required on every `CT_Anchor` and `EG_WrapType` is a required choice of
-  // one wrap element, so the flag beside `wrapSquare` or `wrapTight` is a valid, ordinary
-  // combination. It selects the paint layer; the wrap element selects the wrapping. Word
-  // and LibreOffice both flow text around such a float — measured on a Word and a
-  // LibreOffice export of the same document, not inferred. Re-testing the flag here used
-  // to drop the exclusion and run the text straight through the picture.
+  // `behindDoc` controls painting, while the wrap element controls text flow.
   test.each([
     ['square', '<wp:wrapSquare wrapText="bothSides" distT="0" distB="0" distL="0" distR="0"/>'],
     [
@@ -225,7 +220,6 @@ describe('wrapNone behind/inFront produce no exclusion', () => {
       contentRight: 468,
     });
     expect(zone).not.toBeNull();
-    // Painting is the part `behindDoc` does govern, and it is unchanged.
     expect(paintLayerOf(drawing)).toBe('behind');
   });
 });
