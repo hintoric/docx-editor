@@ -8,6 +8,8 @@ import { CalendarDay } from '@docx-editor.dev/core/editor';
 import { CalendarMonth } from '@docx-editor.dev/core/editor';
 import { CHROME_GROUPS } from '@docx-editor.dev/core/editor';
 import { CHROME_MENUS } from '@docx-editor.dev/core/editor';
+import { ChromeExportFormat } from '@docx-editor.dev/core/editor';
+import { ChromeExportHandlers } from '@docx-editor.dev/core/editor';
 import { ChromeMenu } from '@docx-editor.dev/core/editor';
 import { ChromeMenuEntry } from '@docx-editor.dev/core/editor';
 import { ChromeMenuId } from '@docx-editor.dev/core/editor';
@@ -16,6 +18,7 @@ import { ChromeMenuSeparatorEntry } from '@docx-editor.dev/core/editor';
 import { chromeMenuSlots } from '@docx-editor.dev/core/editor';
 import { ChromeMenuSubmenuEntry } from '@docx-editor.dev/core/editor';
 import { ChromeSlotId } from '@docx-editor.dev/core/editor';
+import { ClearRefreshHighlightsOptions } from '@docx-editor.dev/core/editor';
 import { ColorValue } from '@docx-editor.dev/core/contracts/editor';
 import { commandForSlot } from '@docx-editor.dev/core/editor';
 import { ComponentType } from 'react';
@@ -25,11 +28,15 @@ import { ContentControlListNavigation } from '@docx-editor.dev/core/editor';
 import { ContentControlSummary } from '@docx-editor.dev/core';
 import { ContentControlType } from '@docx-editor.dev/core';
 import { ContentControlWidgetSession } from '@docx-editor.dev/core/editor';
+import { createDocumentRefresh } from '@docx-editor.dev/core/editor';
 import { createFontSource } from '@docx-editor.dev/core/editor';
 import { CSSProperties } from 'react';
 import { defineFontResolver } from '@docx-editor.dev/core/editor';
 import { DocumentChange } from '@docx-editor.dev/core/contracts/editor';
 import { DocumentHandle } from '@docx-editor.dev/core/contracts/editor';
+import { DocumentRefresh } from '@docx-editor.dev/core/editor';
+import { DocumentRefreshError } from '@docx-editor.dev/core/editor';
+import { DocumentRefreshState } from '@docx-editor.dev/core/editor';
 import { DocumentSource } from '@docx-editor.dev/core/contracts/editor';
 import { DocxDocument } from '@docx-editor.dev/core/contracts/types';
 import { DocxEditorInstance } from '@docx-editor.dev/core/editor';
@@ -74,6 +81,7 @@ import { LOADING_SNAPSHOT } from '@docx-editor.dev/core/editor';
 import { LocaleStrings } from '@docx-editor.dev/i18n';
 import { MarkedFontResolver } from '@docx-editor.dev/core/editor';
 import { MAX_RESOLVER_FAMILIES } from '@docx-editor.dev/core/editor';
+import { NavigateToChangeOptions } from '@docx-editor.dev/core/editor';
 import { NavigationCommand } from '@docx-editor.dev/core/editor';
 import { PageSetup } from '@docx-editor.dev/core/contracts/editor';
 import { PaginatedSurfaceState } from '@docx-editor.dev/core/editor';
@@ -91,6 +99,15 @@ import { ReactElement } from 'react';
 import { ReactNode } from 'react';
 import { Ref } from 'react';
 import { RefAttributes } from 'react';
+import { RefreshChange } from '@docx-editor.dev/core/editor';
+import { RefreshChangeInput } from '@docx-editor.dev/core/editor';
+import { RefreshFailureCode } from '@docx-editor.dev/core/editor';
+import { RefreshHighlightAnimation } from '@docx-editor.dev/core/editor';
+import { RefreshHighlightOptions } from '@docx-editor.dev/core/editor';
+import { RefreshLocation } from '@docx-editor.dev/core/editor';
+import { RefreshResult } from '@docx-editor.dev/core/editor';
+import { RefreshSubmission } from '@docx-editor.dev/core/editor';
+import { RefreshUpdate } from '@docx-editor.dev/core/editor';
 import { ReviewAuthorInfo } from '@docx-editor.dev/core/editor';
 import { RevisionAuthorAssignments } from '@docx-editor.dev/core/editor';
 import { RevisionAuthorStyle } from '@docx-editor.dev/core/editor';
@@ -123,6 +140,10 @@ export { CHROME_GROUPS }
 
 export { CHROME_MENUS }
 
+export { ChromeExportFormat }
+
+export { ChromeExportHandlers }
+
 export { ChromeMenu }
 
 export { ChromeMenuEntry }
@@ -141,6 +162,8 @@ export { ChromeSlotId }
 
 // @public
 export type ChromeTranslate = (key: string, params?: Record<string, string | number>) => string;
+
+export { ClearRefreshHighlightsOptions }
 
 export { commandForSlot }
 
@@ -385,6 +408,8 @@ export interface ContextMenuTableRowProps extends ContextMenuCommandProps {
     destructive?: boolean;
 }
 
+export { createDocumentRefresh }
+
 export { createFontSource }
 
 export { defineFontResolver }
@@ -430,6 +455,12 @@ export function DocumentName(input: DocumentNameProps): react__default.JSX.Eleme
 
 // @public (undocumented)
 export const DocumentOutline: react__default.NamedExoticComponent<DocumentOutlineProps>;
+
+export { DocumentRefresh }
+
+export { DocumentRefreshError }
+
+export { DocumentRefreshState }
 
 export { DocxDocument }
 
@@ -633,6 +664,21 @@ export interface DocxEditorDocumentOutlineProps {
 export function DocxEditorEquation(): react.JSX.Element | null;
 
 // @public
+export function DocxEditorExportDialog(input: DocxEditorExportDialogProps): react.JSX.Element | null;
+
+// @public
+export interface DocxEditorExportDialogProps {
+    children?: DocxEditorChildren;
+    className?: string;
+    error: string;
+    format: ChromeExportFormat;
+    onClose(): void;
+    open: boolean;
+    pending: boolean;
+    style?: CSSProperties;
+}
+
+// @public
 export function DocxEditorFontNotice(input: DocxEditorFontNoticeProps): react.JSX.Element | null;
 
 // @public
@@ -767,6 +813,10 @@ export interface DocxEditorMenuNamespace {
     (props: DocxEditorMenuProps): ReactNode;
     readonly Entry: typeof MenuEntry;
     // (undocumented)
+    readonly ExportMarkdown: typeof MenuExportMarkdown;
+    // (undocumented)
+    readonly ExportPdf: typeof MenuExportPdf;
+    // (undocumented)
     readonly File: MenuPartComponent;
     // (undocumented)
     readonly Format: MenuPartComponent;
@@ -782,6 +832,8 @@ export interface DocxEditorMenuNamespace {
     readonly Open: typeof MenuOpen;
     // (undocumented)
     readonly PageSetup: typeof MenuPageSetup;
+    // (undocumented)
+    readonly Print: typeof MenuPrint;
     readonly ReportIssue: typeof MenuReportIssue;
     // (undocumented)
     readonly Review: typeof MenuReview;
@@ -801,6 +853,7 @@ export interface DocxEditorMenuProps {
     // (undocumented)
     children?: DocxEditorChildren;
     className?: string;
+    exporters?: ChromeExportHandlers;
     fileName?: string;
     onOpen?: () => void;
     onOpenFile?: (file: File) => void;
@@ -826,6 +879,7 @@ export interface DocxEditorNamespace extends ForwardRefExoticComponent<DocxEdito
     readonly ContextMenu: typeof ContextMenu;
     readonly DocumentOutline: typeof DocxEditorDocumentOutline;
     readonly Equation: typeof DocxEditorEquation;
+    readonly ExportDialog: typeof DocxEditorExportDialog;
     readonly FontNotice: typeof DocxEditorFontNotice;
     readonly HeaderFooterChrome: typeof DocxEditorHeaderFooterChrome;
     readonly HorizontalRuler: typeof DocxEditorHorizontalRuler;
@@ -851,6 +905,7 @@ export interface DocxEditorNamespace extends ForwardRefExoticComponent<DocxEdito
     readonly PageSetupDialog: typeof DocxEditorPageSetupDialog;
     // (undocumented)
     readonly ParagraphDialog: typeof DocxEditorParagraphDialog;
+    readonly PrintDialog: typeof DocxEditorPrintDialog;
     // (undocumented)
     readonly Root: typeof DocxEditorRoot;
     readonly TextFormFieldDialog: typeof DocxEditorTextFormFieldDialog;
@@ -987,28 +1042,28 @@ export interface DocxEditorPageNumberProps {
 // @public
 export const DocxEditorPageSetupDialog: typeof PageSetupDialogRoot & {
     Apply: (props: DialogPartProps & {
-        name?: "pageSize" | "orientation" | "scope" | "marginLeft" | "marginRight" | "marginBottom" | "marginTop" | undefined;
+        name?: "scope" | "orientation" | "pageSize" | "marginLeft" | "marginRight" | "marginBottom" | "marginTop" | undefined;
     }) => string | number | bigint | boolean | Iterable<react.ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<react.ReactNode> | null | undefined> | react.JSX.Element | null;
     Body: (props: DialogPartProps & {
-        name?: "pageSize" | "orientation" | "scope" | "marginLeft" | "marginRight" | "marginBottom" | "marginTop" | undefined;
+        name?: "scope" | "orientation" | "pageSize" | "marginLeft" | "marginRight" | "marginBottom" | "marginTop" | undefined;
     }) => string | number | bigint | boolean | Iterable<react.ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<react.ReactNode> | null | undefined> | react.JSX.Element | null;
     Cancel: (props: DialogPartProps & {
-        name?: "pageSize" | "orientation" | "scope" | "marginLeft" | "marginRight" | "marginBottom" | "marginTop" | undefined;
+        name?: "scope" | "orientation" | "pageSize" | "marginLeft" | "marginRight" | "marginBottom" | "marginTop" | undefined;
     }) => string | number | bigint | boolean | Iterable<react.ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<react.ReactNode> | null | undefined> | react.JSX.Element | null;
     Error: (props: DialogPartProps & {
-        name?: "pageSize" | "orientation" | "scope" | "marginLeft" | "marginRight" | "marginBottom" | "marginTop" | undefined;
+        name?: "scope" | "orientation" | "pageSize" | "marginLeft" | "marginRight" | "marginBottom" | "marginTop" | undefined;
     }) => string | number | bigint | boolean | Iterable<react.ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<react.ReactNode> | null | undefined> | react.JSX.Element | null;
     Field: (props: DialogPartProps & {
-        name: "pageSize" | "orientation" | "scope" | "marginLeft" | "marginRight" | "marginBottom" | "marginTop";
+        name: "scope" | "orientation" | "pageSize" | "marginLeft" | "marginRight" | "marginBottom" | "marginTop";
     }) => react.ReactNode;
     Footer: (props: DialogPartProps & {
-        name?: "pageSize" | "orientation" | "scope" | "marginLeft" | "marginRight" | "marginBottom" | "marginTop" | undefined;
+        name?: "scope" | "orientation" | "pageSize" | "marginLeft" | "marginRight" | "marginBottom" | "marginTop" | undefined;
     }) => string | number | bigint | boolean | Iterable<react.ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<react.ReactNode> | null | undefined> | react.JSX.Element | null;
     Header: (props: DialogPartProps & {
-        name?: "pageSize" | "orientation" | "scope" | "marginLeft" | "marginRight" | "marginBottom" | "marginTop" | undefined;
+        name?: "scope" | "orientation" | "pageSize" | "marginLeft" | "marginRight" | "marginBottom" | "marginTop" | undefined;
     }) => string | number | bigint | boolean | Iterable<react.ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<react.ReactNode> | null | undefined> | react.JSX.Element | null;
     Title: (props: DialogPartProps & {
-        name?: "pageSize" | "orientation" | "scope" | "marginLeft" | "marginRight" | "marginBottom" | "marginTop" | undefined;
+        name?: "scope" | "orientation" | "pageSize" | "marginLeft" | "marginRight" | "marginBottom" | "marginTop" | undefined;
     }) => string | number | bigint | boolean | Iterable<react.ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<react.ReactNode> | null | undefined> | react.JSX.Element | null;
 };
 
@@ -1021,28 +1076,28 @@ export interface DocxEditorPageSetupDialogProps extends DialogCustomizationProps
 // @public
 export const DocxEditorParagraphDialog: typeof ParagraphDialogRoot & {
     Apply: (props: DialogPartProps & {
-        name?: "alignment" | "special" | "spaceBefore" | "spaceAfter" | "contextualSpacing" | "keepNext" | "keepLines" | "widowControl" | "pageBreakBefore" | "tabStops" | "lineRule" | "indentLeft" | "indentRight" | "specialBy" | "lineValue" | undefined;
+        name?: "keepNext" | "keepLines" | "pageBreakBefore" | "widowControl" | "contextualSpacing" | "alignment" | "spaceBefore" | "spaceAfter" | "lineRule" | "tabStops" | "special" | "indentLeft" | "indentRight" | "specialBy" | "lineValue" | undefined;
     }) => string | number | bigint | boolean | Iterable<react.ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<react.ReactNode> | null | undefined> | react.JSX.Element | null;
     Body: (props: DialogPartProps & {
-        name?: "alignment" | "special" | "spaceBefore" | "spaceAfter" | "contextualSpacing" | "keepNext" | "keepLines" | "widowControl" | "pageBreakBefore" | "tabStops" | "lineRule" | "indentLeft" | "indentRight" | "specialBy" | "lineValue" | undefined;
+        name?: "keepNext" | "keepLines" | "pageBreakBefore" | "widowControl" | "contextualSpacing" | "alignment" | "spaceBefore" | "spaceAfter" | "lineRule" | "tabStops" | "special" | "indentLeft" | "indentRight" | "specialBy" | "lineValue" | undefined;
     }) => string | number | bigint | boolean | Iterable<react.ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<react.ReactNode> | null | undefined> | react.JSX.Element | null;
     Cancel: (props: DialogPartProps & {
-        name?: "alignment" | "special" | "spaceBefore" | "spaceAfter" | "contextualSpacing" | "keepNext" | "keepLines" | "widowControl" | "pageBreakBefore" | "tabStops" | "lineRule" | "indentLeft" | "indentRight" | "specialBy" | "lineValue" | undefined;
+        name?: "keepNext" | "keepLines" | "pageBreakBefore" | "widowControl" | "contextualSpacing" | "alignment" | "spaceBefore" | "spaceAfter" | "lineRule" | "tabStops" | "special" | "indentLeft" | "indentRight" | "specialBy" | "lineValue" | undefined;
     }) => string | number | bigint | boolean | Iterable<react.ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<react.ReactNode> | null | undefined> | react.JSX.Element | null;
     Error: (props: DialogPartProps & {
-        name?: "alignment" | "special" | "spaceBefore" | "spaceAfter" | "contextualSpacing" | "keepNext" | "keepLines" | "widowControl" | "pageBreakBefore" | "tabStops" | "lineRule" | "indentLeft" | "indentRight" | "specialBy" | "lineValue" | undefined;
+        name?: "keepNext" | "keepLines" | "pageBreakBefore" | "widowControl" | "contextualSpacing" | "alignment" | "spaceBefore" | "spaceAfter" | "lineRule" | "tabStops" | "special" | "indentLeft" | "indentRight" | "specialBy" | "lineValue" | undefined;
     }) => string | number | bigint | boolean | Iterable<react.ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<react.ReactNode> | null | undefined> | react.JSX.Element | null;
     Field: (props: DialogPartProps & {
-        name: "alignment" | "special" | "spaceBefore" | "spaceAfter" | "contextualSpacing" | "keepNext" | "keepLines" | "widowControl" | "pageBreakBefore" | "tabStops" | "lineRule" | "indentLeft" | "indentRight" | "specialBy" | "lineValue";
+        name: "keepNext" | "keepLines" | "pageBreakBefore" | "widowControl" | "contextualSpacing" | "alignment" | "spaceBefore" | "spaceAfter" | "lineRule" | "tabStops" | "special" | "indentLeft" | "indentRight" | "specialBy" | "lineValue";
     }) => react.ReactNode;
     Footer: (props: DialogPartProps & {
-        name?: "alignment" | "special" | "spaceBefore" | "spaceAfter" | "contextualSpacing" | "keepNext" | "keepLines" | "widowControl" | "pageBreakBefore" | "tabStops" | "lineRule" | "indentLeft" | "indentRight" | "specialBy" | "lineValue" | undefined;
+        name?: "keepNext" | "keepLines" | "pageBreakBefore" | "widowControl" | "contextualSpacing" | "alignment" | "spaceBefore" | "spaceAfter" | "lineRule" | "tabStops" | "special" | "indentLeft" | "indentRight" | "specialBy" | "lineValue" | undefined;
     }) => string | number | bigint | boolean | Iterable<react.ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<react.ReactNode> | null | undefined> | react.JSX.Element | null;
     Header: (props: DialogPartProps & {
-        name?: "alignment" | "special" | "spaceBefore" | "spaceAfter" | "contextualSpacing" | "keepNext" | "keepLines" | "widowControl" | "pageBreakBefore" | "tabStops" | "lineRule" | "indentLeft" | "indentRight" | "specialBy" | "lineValue" | undefined;
+        name?: "keepNext" | "keepLines" | "pageBreakBefore" | "widowControl" | "contextualSpacing" | "alignment" | "spaceBefore" | "spaceAfter" | "lineRule" | "tabStops" | "special" | "indentLeft" | "indentRight" | "specialBy" | "lineValue" | undefined;
     }) => string | number | bigint | boolean | Iterable<react.ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<react.ReactNode> | null | undefined> | react.JSX.Element | null;
     Title: (props: DialogPartProps & {
-        name?: "alignment" | "special" | "spaceBefore" | "spaceAfter" | "contextualSpacing" | "keepNext" | "keepLines" | "widowControl" | "pageBreakBefore" | "tabStops" | "lineRule" | "indentLeft" | "indentRight" | "specialBy" | "lineValue" | undefined;
+        name?: "keepNext" | "keepLines" | "pageBreakBefore" | "widowControl" | "contextualSpacing" | "alignment" | "spaceBefore" | "spaceAfter" | "lineRule" | "tabStops" | "special" | "indentLeft" | "indentRight" | "specialBy" | "lineValue" | undefined;
     }) => string | number | bigint | boolean | Iterable<react.ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<react.ReactNode> | null | undefined> | react.JSX.Element | null;
 };
 
@@ -1067,6 +1122,7 @@ export interface DocxEditorPopups {
     contextMenu?: DocxEditorPopup<DocxEditorContextMenuProps>;
     // (undocumented)
     equation?: DocxEditorPopup<Record<string, never>>;
+    export?: DocxEditorPopup<DocxEditorExportDialogProps>;
     // (undocumented)
     hyperlink?: DocxEditorPopup<HyperLinkProps>;
     // (undocumented)
@@ -1085,8 +1141,24 @@ export interface DocxEditorPopups {
     pageSetup?: DocxEditorPopup<DocxEditorPageSetupDialogProps>;
     // (undocumented)
     paragraph?: DocxEditorPopup<DocxEditorParagraphDialogProps>;
+    print?: DocxEditorPopup<DocxEditorPrintDialogProps>;
     // (undocumented)
     textFormField?: DocxEditorPopup<DocxEditorTextFormFieldDialogProps>;
+}
+
+// @public
+export function DocxEditorPrintDialog(input: DocxEditorPrintDialogProps): react.JSX.Element | null;
+
+// @public
+export interface DocxEditorPrintDialogProps {
+    children?: DocxEditorChildren;
+    className?: string;
+    error: string;
+    onClose(): void;
+    open: boolean;
+    pending: boolean;
+    style?: CSSProperties;
+    url: string;
 }
 
 // @public
@@ -1800,6 +1872,8 @@ export interface MenuTableGridProps {
     slot?: ChromeSlotId;
 }
 
+export { NavigateToChangeOptions }
+
 // @public
 export const NAVIGATION_PANE_GAP = 16;
 
@@ -2118,6 +2192,24 @@ export interface ProvideDocxEditorResult {
 export { PX_PER_CM }
 
 export { PX_PER_INCH }
+
+export { RefreshChange }
+
+export { RefreshChangeInput }
+
+export { RefreshFailureCode }
+
+export { RefreshHighlightAnimation }
+
+export { RefreshHighlightOptions }
+
+export { RefreshLocation }
+
+export { RefreshResult }
+
+export { RefreshSubmission }
+
+export { RefreshUpdate }
 
 // @public
 export const REVIEW_MARKERS_GUTTER = 44;

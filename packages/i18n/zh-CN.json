@@ -34,7 +34,28 @@
     "insertFootnote": "插入脚注",
     "insertEndnote": "插入尾注",
     "insertTable": null,
-    "review": null
+    "review": null,
+    "export": null,
+    "exportFailed": null,
+    "exportMarkdown": null,
+    "exportMarkdownMissing": null,
+    "exportPdf": null,
+    "exportPdfMissing": null,
+    "exportPdfServerUnavailable": null,
+    "exportContinueEditing": null,
+    "exportDownloadHint": null,
+    "exportMarkdownFailed": null,
+    "exportPdfFailed": null,
+    "exportingMarkdown": null,
+    "exportingPdf": null,
+    "printFailed": null,
+    "printFailedMessage": null,
+    "printOpenPdf": null,
+    "printPdfMissing": null,
+    "printPreparing": null,
+    "printNoViewer": null,
+    "printLoadFailed": null,
+    "printRefused": null
   },
   "formattingBar": {
     "groups": {
@@ -79,7 +100,8 @@
     "imageWrap": "环绕文字",
     "formatPainter": null,
     "formatPainterShortcut": null,
-    "paragraphMarks": null
+    "paragraphMarks": null,
+    "label": null
   },
   "alignment": {
     "alignLeft": "左对齐",
@@ -469,7 +491,9 @@
   "editor": {
     "showDocumentOutline": "显示文档大纲",
     "linkCopied": "链接已复制到剪贴板",
-    "fontSubstitutionNotice": "此文档中的某些字体不可用，已显示替代字体：{fonts}"
+    "fontSubstitutionNotice": "此文档中的某些字体不可用，已显示替代字体：{fonts}",
+    "documentContent": null,
+    "documentViewport": null
   },
   "hyperlinkPopup": {
     "displayTextPlaceholder": "显示文本",
@@ -916,5 +940,43 @@
     "lowercase": null,
     "firstCapital": null,
     "titleCase": null
+  },
+  "documentRefresh": {
+    "cancel": null,
+    "cancelled": null,
+    "capturing": null,
+    "clear": null,
+    "complete": null,
+    "count": null,
+    "delivery": null,
+    "description": null,
+    "download": null,
+    "empty": null,
+    "failed": null,
+    "idle": null,
+    "invalidDocument": null,
+    "limitations": null,
+    "loadError": null,
+    "localEdits": null,
+    "next": null,
+    "partial": null,
+    "position": null,
+    "previous": null,
+    "processing": null,
+    "recovering": null,
+    "recoveryFailed": null,
+    "refreshing": null,
+    "reset": null,
+    "retry": null,
+    "review": null,
+    "show": null,
+    "start": null,
+    "title": null,
+    "unavailable": null,
+    "sampleDescription": null,
+    "scrollToChange": null,
+    "scrolled": null,
+    "processingLabel": null,
+    "sampleEdited": null
   }
 }

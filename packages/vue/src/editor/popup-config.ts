@@ -1,3 +1,5 @@
+import type { DocxEditorExportDialogProps } from './DocxEditorExportDialog';
+import type { DocxEditorPrintDialogProps } from './DocxEditorPrintDialog';
 import { renderPopup, type DocxEditorPopup } from './popup-renderer';
 import type { DocxEditorContentControlWidgetProps } from './DocxEditorContentControlWidget';
 import type { DocxEditorInvalidTextFormFieldDialogProps } from './DocxEditorInvalidTextFormFieldDialog';
@@ -29,6 +31,10 @@ import { useTranslation } from '../i18n';
 
 /** Render overrides for automatically hosted editor popups. False disables a popup. @public */
 export interface DocxEditorPopups {
+  /** File export progress and errors. False hides feedback without stopping conversion. */
+  export?: DocxEditorPopup<DocxEditorExportDialogProps>;
+  /** File print progress and errors. False hides feedback; printing still runs. */
+  print?: DocxEditorPopup<DocxEditorPrintDialogProps>;
   contentControlWidget?: DocxEditorPopup<DocxEditorContentControlWidgetProps>;
   /**
    * Renderer for checkbox presses. Omitted, the engine toggles the box itself and

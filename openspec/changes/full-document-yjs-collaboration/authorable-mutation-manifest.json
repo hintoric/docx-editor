@@ -12,7 +12,7 @@
     "headerFooterLifecycle": 6,
     "noteLifecycle": 5,
     "treeDocOpUnsupported": 2,
-    "chromeSlots": 67,
+    "chromeSlots": 70,
     "chromeCommandWired": 39,
     "chromeProbe": 6,
     "acceptedRunProperties": 19,
@@ -1287,6 +1287,9 @@
       "paragraph.dialog",
       "file.open",
       "file.save",
+      "file.exportMarkdown",
+      "file.exportPdf",
+      "file.print",
       "file.pageSetup",
       "insert.footnote",
       "insert.endnote",
@@ -1369,7 +1372,10 @@
       "review.comments",
       "review.authors",
       "file.open",
-      "file.save"
+      "file.save",
+      "file.exportMarkdown",
+      "file.exportPdf",
+      "file.print"
     ]
   },
   "unsupportedRows": [

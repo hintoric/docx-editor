@@ -1,4 +1,11 @@
-import { useDialogHost } from '../dialog-host';
+import { DocxEditorExportDialog } from '../DocxEditorExportDialog';
+import { DocxEditorPrintDialog } from '../DocxEditorPrintDialog';
+import { usePopupConfig } from '../popup-config';
+import { renderPopup } from '../popup-renderer';
+import { useMenuExport } from './useMenuExport';
+import { useMenuPrint } from './useMenuPrint';
+import type { ChromeExportHandlers } from '@docx-editor.dev/core/editor';
+import { DialogPortal, useDialogHost } from '../dialog-host';
 import type { DocxEditorChildren } from '../../docx-editor-children';
 import type { ReactNode } from 'react';
 // The compound menu bar: File · Format · Insert · Review · Help, derived FROM the chrome registry.
@@ -31,7 +38,11 @@ import {
   useState,
 } from 'react';
 import type { ReactElement } from 'react';
-import { CHROME_MENUS, type ChromeMenuId } from '@docx-editor.dev/core/editor';
+import {
+  CHROME_MENUS,
+  isChromePrintShortcut,
+  type ChromeMenuId,
+} from '@docx-editor.dev/core/editor';
 import { useDocxEditor } from '../context';
 import { editorScopeFor } from '../editor-scope';
 import { useTranslation } from '../../i18n';
@@ -42,7 +53,7 @@ import type { ToolbarTranslate } from '../toolbar/toolbar-context';
 import { guardToolbarMousedown } from '../toolbar/ToolbarButton';
 import { MenuContext, type MenuContextValue, type MenuId } from './menu-context';
 import { download, downloadName } from './download';
-import { barTriggers } from './menu-keyboard';
+import { barTriggers, restoreExportFocus } from './menu-keyboard';
 import {
   Menu,
   MenuEntry,
@@ -56,6 +67,9 @@ import {
   MenuPageSetup,
   MenuRow,
   MenuSave,
+  MenuExportMarkdown,
+  MenuExportPdf,
+  MenuPrint,
   MenuGroup,
   MenuSeparator,
   MenuReportIssue,
@@ -77,6 +91,11 @@ const MENU_PARTS: Record<ChromeMenuId, MenuPartComponent> = {
 
 /** Props for `DocxEditor.Menu`. @public */
 export interface DocxEditorMenuProps {
+  /**
+   * Converter handlers. Markdown requires docx-to-markdown; PDF requires docx-to-pdf on Node.js.
+   * File > Print also uses the PDF handler. Missing handlers show an error.
+   */
+  exporters?: ChromeExportHandlers;
   /** Appended after the base `docx-menubar` class. */
   className?: string;
   /** i18n resolver for row labels; without it the raw keys show (never English). */
@@ -158,12 +177,14 @@ function menuOfChild(child: ReactNode): ChromeMenuId | null {
 
 function DocxEditorMenuRoot(props: DocxEditorMenuProps) {
   const dialogs = useDialogHost();
+  const popups = usePopupConfig();
   // Skip the scope class when the packaged wrapper already carries it.
   const scopeClassName = useScopeClassName();
   const {
     className,
     t,
     fileName,
+    exporters,
     onOpen,
     onOpenFile,
     onSave,
@@ -182,6 +203,11 @@ function DocxEditorMenuRoot(props: DocxEditorMenuProps) {
   const [openedName, setOpenedName] = useState<string | null>(null);
   // The bar's single tab stop. Defaults to the first rendered menu; arrowing along the bar
   // moves it, and opening a menu takes it so Escape returns focus somewhere sensible.
+  const exportState = useMenuExport(editor, exporters, fileName ?? openedName ?? undefined);
+  const { pending: exportPending, execute: executeExport } = exportState;
+  const printState = useMenuPrint(editor, exporters, popups?.print !== false);
+  const { active: printActive, execute: executePrint } = printState;
+  const printPopupShown = printState.visible && popups?.print !== false;
   const [activeMenu, setActiveMenu] = useState<MenuId | null>(null);
   const [pageSetupOpen, setPageSetupOpen] = useState(false);
   const [paragraphDialogOpen, setParagraphDialogOpen] = useState(false);
@@ -247,20 +273,35 @@ function DocxEditorMenuRoot(props: DocxEditorMenuProps) {
   // is what disables the row before the document is ready.
   const resolvedOpen = editor ? (onOpen ?? packagedOpen) : undefined;
   const resolvedSave = editor ? (onSave ?? packagedSave) : undefined;
+  const hasPdfExporter = !!exporters?.pdf;
+  // Unavailable while a print session is open, so the row and Ctrl+P cannot start a second.
+  const resolvedPrint = useMemo(
+    () =>
+      editor && !printActive
+        ? () => {
+            restoreExportFocus(rootRef.current);
+            // The frame goes inside the editor, so a host's modal dialog does not make it inert.
+            void executePrint(editorScopeFor(rootRef.current) ?? rootRef.current ?? undefined);
+          }
+        : undefined,
+    [editor, printActive, executePrint]
+  );
   const resolvedPageSetup = editor
     ? dialogs?.ownsPageSetup
       ? packagedPageSetup
       : (onPageSetup ?? packagedPageSetup)
     : undefined;
 
-  // Ctrl/Cmd+O and Ctrl/Cmd+S, so the shortcut column tells the truth. Both are what the
-  // browser would otherwise handle (open a local file, save the page), and an editor that
-  // leaves Cmd+S to the browser is the surprising one.
+  // Ctrl/Cmd+O, Ctrl/Cmd+S and Ctrl/Cmd+P, so the shortcut column tells the truth. All are
+  // what the browser would otherwise handle (open a local file, save or print the page),
+  // and an editor that leaves Cmd+S to the browser is the surprising one. Ctrl/Cmd+P is
+  // left to the browser when no PDF handler is configured.
   useEffect(() => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
       const key = event.key.toLowerCase();
-      if (key !== 's' && key !== 'o') return;
+      const print = isChromePrintShortcut(event);
+      if (key !== 's' && key !== 'o' && !print) return;
       // SCOPED to this editor. A document-level listener that fires wherever focus happens
       // to be means an embedded editor eats the host page's Cmd+S while the user types in
       // an unrelated field, and two mounted editors both answer one keypress. The shortcut
@@ -273,7 +314,15 @@ function DocxEditorMenuRoot(props: DocxEditorMenuProps) {
       const target = event.target as Node | null;
       const scope = editorScopeFor(rootRef.current) ?? rootRef.current;
       if (!target || !scope?.contains(target)) return;
-      if (key === 's' && resolvedSave) {
+      if (print) {
+        // Checked first: on some layouts the P key types a character other than "p".
+        if (!hasPdfExporter || !editor) return;
+        // Also claimed while the print popup shows, so the browser does not print the editor
+        // page under it. Otherwise a busy session leaves the key to the browser.
+        if (!resolvedPrint && !printPopupShown) return;
+        event.preventDefault();
+        resolvedPrint?.();
+      } else if (key === 's' && resolvedSave) {
         event.preventDefault();
         resolvedSave();
       } else if (key === 'o' && resolvedOpen) {
@@ -283,7 +332,7 @@ function DocxEditorMenuRoot(props: DocxEditorMenuProps) {
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [resolvedOpen, resolvedSave]);
+  }, [resolvedOpen, resolvedSave, resolvedPrint, printPopupShown, hasPdfExporter, editor]);
 
   const context = useMemo<MenuContextValue>(
     () => ({
@@ -293,6 +342,15 @@ function DocxEditorMenuRoot(props: DocxEditorMenuProps) {
       activeMenu,
       onOpen: resolvedOpen,
       onSave: resolvedSave,
+      onExport:
+        editor && !exportPending
+          ? (format) => {
+              restoreExportFocus(rootRef.current);
+              return executeExport(format);
+            }
+          : undefined,
+      onPrint: resolvedPrint,
+      printShortcut: hasPdfExporter,
       onPageSetup: resolvedPageSetup,
       onParagraphDialog: () =>
         dialogs
@@ -307,6 +365,11 @@ function DocxEditorMenuRoot(props: DocxEditorMenuProps) {
       reportIssue,
     }),
     [
+      editor,
+      exportPending,
+      executeExport,
+      resolvedPrint,
+      hasPdfExporter,
       t,
       openMenu,
       openMenuAndFocus,
@@ -394,6 +457,54 @@ function DocxEditorMenuRoot(props: DocxEditorMenuProps) {
       >
         {content}
       </div>
+      <DialogPortal>
+        {exportState.visible && popups?.export !== false ? (
+          popups?.export ? (
+            renderPopup(
+              popups.export,
+              {
+                open: true,
+                format: exportState.format,
+                pending: exportState.pending,
+                error: exportState.error,
+                onClose: exportState.dismiss,
+              },
+              exportState.session
+            )
+          ) : (
+            <DocxEditorExportDialog
+              open
+              format={exportState.format}
+              pending={exportState.pending}
+              error={exportState.error}
+              onClose={exportState.dismiss}
+            />
+          )
+        ) : null}
+        {printState.visible && popups?.print !== false ? (
+          popups?.print ? (
+            renderPopup(
+              popups.print,
+              {
+                open: true,
+                pending: printState.pending,
+                error: printState.error,
+                url: printState.url,
+                onClose: printState.close,
+              },
+              printState.session
+            )
+          ) : (
+            <DocxEditorPrintDialog
+              open
+              pending={printState.pending}
+              error={printState.error}
+              url={printState.url}
+              onClose={printState.close}
+            />
+          )
+        ) : null}
+      </DialogPortal>
       {/* Opening a document is a FILE READ the user drives — never a fetched URL. Mounted
           even when the host overrode `onOpen`, because the input costs nothing and a host
           that later drops the override keeps working. */}
@@ -456,6 +567,9 @@ export interface DocxEditorMenuNamespace {
   readonly Entry: typeof MenuEntry;
   readonly Open: typeof MenuOpen;
   readonly Save: typeof MenuSave;
+  readonly ExportMarkdown: typeof MenuExportMarkdown;
+  readonly ExportPdf: typeof MenuExportPdf;
+  readonly Print: typeof MenuPrint;
   readonly PageSetup: typeof MenuPageSetup;
   /** Insert › Image, so a host can hide it or place it elsewhere by name. */
   readonly ImageInsert: typeof MenuImageInsert;
@@ -491,6 +605,9 @@ export const DocxEditorMenu: DocxEditorMenuNamespace = Object.assign(DocxEditorM
   Entry: MenuEntry,
   Open: MenuOpen,
   Save: MenuSave,
+  ExportMarkdown: MenuExportMarkdown,
+  ExportPdf: MenuExportPdf,
+  Print: MenuPrint,
   PageSetup: MenuPageSetup,
   ImageInsert: MenuImageInsert,
   Reviewers: MenuReviewers,

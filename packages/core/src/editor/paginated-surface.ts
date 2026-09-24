@@ -1,5 +1,10 @@
+import { setSurfaceAccessibleLabel } from './surface-accessibility.ts';
+import { refreshWriteBlocked, registerRefreshComposition } from './refresh-write-guard.ts';
 import { createLegacyDropdownInteraction } from './surface-legacy-dropdown.ts';
 import { listSeparatorEnter } from './list-separator-enter.ts';
+import { browserInputPending } from './surface-input-pending.ts';
+export { setPaginatedSurfaceScale } from './surface-scale.ts';
+import { REPLICABLE_REVIEW_WRITES } from './surface-review-writes.ts';
 import { listParagraphStyleId } from './surface-list-style.ts';
 import { ensureSeparatorStyle } from './list-separator-style.ts';
 import { armContentControlMenuDismiss } from './content-control-widget-dismiss.ts';
@@ -94,6 +99,7 @@ import {
   type TreeModelChange,
 } from '@docx-editor.dev/core/store';
 import { resolveSelectedDrawingRecord } from './docx-editor-images.ts';
+import { createHiddenMarkEditing, type RevisionView } from './hidden-mark-joins.ts';
 import { drawingSelectionPosition } from './surface-drawing-selection.ts';
 import { syncActiveFieldShading } from './surface-field-shading.ts';
 import {
@@ -181,7 +187,6 @@ import type {
   PaginatedSurfaceOptions,
   PaginatedSurfaceState,
   RemoteCaretLabelHost,
-  ReviewWriteIntent,
   SurfaceEditingMode,
 } from './paginated-surface-contract.ts';
 import type { ExecResult, SelectionPin, ViewScope } from '../contracts/editor.ts';
@@ -317,40 +322,6 @@ type ScaleMutableSurface = PaginatedSurface & {
 };
 
 /**
- * The review writes a replica admits, and nothing else.
- *
- * FAIL CLOSED, including for an unnamed intent. Review writes reach the store directly instead of
- * through `applyTreeOps`, and the ones that graft a package and swap the shell record no primitive
- * effects, so they replicate as nothing at all — the peer keeps a `commentReference` naming a
- * comment it never got, which is a corrupt document produced silently. A refusal the user can see
- * is the better failure. Add an intent here only with a two-replica test behind it.
- *
- * Every named intent is admitted today. The set stays, and stays fail-closed, because it is what
- * makes the next review write declare itself before a replica carries it.
- */
-const REPLICABLE_REVIEW_WRITES: ReadonlySet<ReviewWriteIntent> = new Set<ReviewWriteIntent>([
-  'comment-add',
-  'comment-delete',
-  'comment-reply',
-  'comment-resolve',
-  'package-scoped',
-  'revision-resolve',
-]);
-
-/**
- * Rescale a mounted surface in place, or report that this one cannot be.
- *
- * Reaches an internal member rather than widening the surface contract, so it has to answer
- * for a surface that does not carry one — a stub or a foreign implementation. `false`, not a
- * TypeError: the caller is a host asking for zoom, and "cannot" is an answer it can render.
- */
-export function setPaginatedSurfaceScale(surface: PaginatedSurface, scale: number): boolean {
-  const rescale = (surface as Partial<ScaleMutableSurface>).setScale;
-  if (typeof rescale !== 'function') return false;
-  return rescale.call(surface, scale);
-}
-
-/**
  * Mount a paginated surface over DOCX bytes.
  *
  * Returns a typed rejection rather than throwing: a failure here is a property of the file,
@@ -441,6 +412,7 @@ export function mountPaginatedSurface(
   pagesLayer.spellcheck = false;
   pagesLayer.setAttribute('role', 'textbox');
   pagesLayer.setAttribute('aria-multiline', 'true');
+  setSurfaceAccessibleLabel(pagesLayer, options.translate);
   pagesLayer.style.outline = 'none';
 
   // The one highlight the browser cannot draw. A SIBLING of the pages, never a child: the
@@ -508,7 +480,7 @@ export function mountPaginatedSurface(
           : null;
       return {
         layout: currentLayout,
-        selection,
+        selection: hiddenMarks.shownSelection(selection),
         measurer,
         ...(armedAtCaret()
           ? {
@@ -926,6 +898,11 @@ export function mountPaginatedSurface(
   const revisionAuthorVisibility =
     runtimeOptions.revisionAuthorVisibility ??
     createRevisionAuthorVisibility(options.hiddenRevisionAuthors);
+  const hiddenMarks = createHiddenMarkEditing({
+    layout: () => currentLayout,
+    part: () => session.partFor(storyScope()) ?? session.part(),
+    view: revisionView,
+  });
   const revisionFilter = (): RevisionAuthorFilter | undefined =>
     reviewView.filter(revisionAuthorVisibility.filterForSession(session));
   const paragraphMarkVisible = (paragraphId: string): boolean => {
@@ -1104,12 +1081,13 @@ export function mountPaginatedSurface(
     storyScope,
     paragraphOrder,
     layout: () => currentLayout,
-    selection: () => selection,
+    // Formatting reads the paragraph where the caret SHOWS; see `hidden-mark-joins.ts`.
+    selection: () => hiddenMarks.shownSelection(selection),
     displayMode: () => revisionDisplayMode(),
     authorFilter: revisionFilter,
     paragraphMarkVisible,
     commit: (run, nextSelection, options) => commit(run, nextSelection, options),
-    orderedRange: () => orderedRange(),
+    orderedRange: () => hiddenMarks.shownRange(orderedRange()),
     selectionMark: () => selectionMark(),
     textOf: (paragraphId) => textOf(paragraphId),
     selectedCells: () => cellSelection?.cellIds,
@@ -1122,12 +1100,12 @@ export function mountPaginatedSurface(
     session: gatedSession,
     storyScope,
     layout: () => currentLayout,
-    selection: () => selection,
+    selection: () => hiddenMarks.shownSelection(selection),
     displayMode: () => revisionDisplayMode(),
     authorFilter: revisionFilter,
     paragraphMarkVisible,
     commit: (run, nextSelection, commitOptions) => commit(run, nextSelection, commitOptions),
-    orderedRange: () => orderedRange(),
+    orderedRange: () => hiddenMarks.shownRange(orderedRange()),
     selectionMark: () => selectionMark(),
     textOf: (paragraphId) => textOf(paragraphId),
     paragraphOrder,
@@ -1371,6 +1349,9 @@ export function mountPaginatedSurface(
   }
 
   let deferredPublishRender: ReturnType<typeof setTimeout> | null = null;
+  /** Nonzero while `commitNow` applies its ops; see `renderPublishedLayout`. */
+  let commitRunDepth = 0;
+  let commitPaintOwed = false;
 
   // Armed once, after the first published render: the derivations a structural edit reads
   // populate their per-node memos in idle tasks instead of inside the first Enter. An edit
@@ -1391,26 +1372,19 @@ export function mountPaginatedSurface(
     });
   }
 
-  /**
-   * `includeContinuous` folds mousemove/wheel into the answer. Paint deferral wants that
-   * (any input beats a repaint); the commit-tail LAYOUT deferral must not — a moving
-   * pointer over a large document would otherwise defer every toolbar op, paste and
-   * programmatic write, so that gate asks for discrete input (keys, clicks) only.
-   */
+  /** See `browserInputPending` for when to pass `includeContinuous`. */
   function hasPendingBrowserInput(includeContinuous = true): boolean {
-    const scheduling = (
-      container.ownerDocument.defaultView?.navigator as
-        | (Navigator & {
-            scheduling?: {
-              isInputPending?: (options?: { includeContinuous?: boolean }) => boolean;
-            };
-          })
-        | undefined
-    )?.scheduling;
-    return scheduling?.isInputPending?.({ includeContinuous }) ?? false;
+    return browserInputPending(container, includeContinuous);
   }
 
   function renderPublishedLayout(): void {
+    // Published from INSIDE a commit (a handler read geometry): `publishAfterCommit` paints it
+    // with the post-edit caret; painting the pre-edit one here too doubled every edit's paint.
+    if (commitRunDepth > 0) {
+      commitPaintOwed = true;
+      armDerivationPrewarmOnce();
+      return;
+    }
     if (!hasPendingBrowserInput()) {
       // `render()` retires any armed deferred publish render itself.
       render();
@@ -1675,6 +1649,11 @@ export function mountPaginatedSurface(
     return new Set([...set, extra]);
   }
 
+  /** A caller about to read painted geometry (scroll extent, the DOM) lands a paint a commit owes. */
+  function payOwedPaint(): void {
+    if (commitPaintOwed) render();
+  }
+
   /** Publish any pending layout. Returns whether it did, so callers can avoid a double paint. */
   function flushLayout(): boolean {
     // Nothing pending means nothing committed since the last pass, so the layout in hand is
@@ -1716,7 +1695,8 @@ export function mountPaginatedSurface(
     ) {
       return;
     }
-    if (!flushLayout()) render();
+    // A refusal reports now even inside another commit, which clears it before its own paint.
+    if (!flushLayout() || (rejected && commitPaintOwed)) render();
   }
 
   /**
@@ -1746,7 +1726,7 @@ export function mountPaginatedSurface(
     // The flushes above render on their own synchronous paths; what can remain is only a
     // paint deferred under input pressure, and that is exactly what must land now.
     // `render()` retires the deferred timer itself.
-    if (deferredPublishRender !== null) {
+    if (deferredPublishRender !== null || commitPaintOwed) {
       render();
       armDerivationPrewarmOnce();
       return true;
@@ -2550,6 +2530,7 @@ export function mountPaginatedSurface(
     // Reading the DOM selection BEFORE the paint replaces the nodes it lives in is what makes
     // a repaint carry a gesture the queued `selectionchange` has not delivered yet, rather
     // than erase it — see `adoptBeforePaint`.
+    commitPaintOwed = false;
     const adopted = selectionSync.adoptBeforePaint();
     const paintBegan = now();
     materializedSet = visiblePages();
@@ -2663,7 +2644,7 @@ export function mountPaginatedSurface(
 
   const caretView = createCaretViewFollower({
     storyScopeOpen: () => Boolean(hfScope?.getActive() || noteOps?.activeNoteScope()),
-    selection: () => selection,
+    selection: () => hiddenMarks.shownSelection(selection),
     layout: () => currentLayout,
     measurer: () => measurer,
     preferredPageIndex: () => selectionSync.selectionPageIndex(),
@@ -2802,6 +2783,7 @@ export function mountPaginatedSurface(
     // The PROTECTION write is document-wide, so neither the view nor where the caret happens
     // to sit has anything to say about it. Without the second exemption a caret parked in a
     // table of contents refused it with a reason about the table of contents.
+    if (refreshWriteBlocked(container)) return 'An external document refresh is in progress.';
     const protectionWrite = isDocumentProtectionBatch(ops);
     if (editingMode === 'view' && !protectionWrite) return VIEWING_REFUSAL;
     if (
@@ -3005,19 +2987,17 @@ export function mountPaginatedSurface(
     return { anchor: move(current.anchor), head: move(current.head) };
   }
 
-  /**
-   * Whether two paragraphs are siblings in the same container, so a join is even expressible.
-   *
-   * `paragraphOrder()` is flat document order: the paragraph before the one after a table is
-   * inside the table's last cell, and the paragraph before the first cell's is outside it.
-   * Neither pair can be joined, and the store says so — but only after the op is built and
-   * the whole transaction refused.
-   */
-  function joinableSiblings(firstId: string, secondId: string): boolean {
-    const part = session.partFor(storyScope()) ?? session.part();
-    const firstParent = parentNodeOf(part, firstId);
-    const secondParent = parentNodeOf(part, secondId);
-    return firstParent !== null && secondParent !== null && firstParent.id === secondParent.id;
+  /** The view layout removes hidden-mark paragraphs in; see `hidden-mark-joins.ts`. */
+  function revisionView(): RevisionView {
+    return { displayMode: revisionDisplayMode(), authorFilter: revisionFilter() };
+  }
+  /** Backspace/Delete from a caret in a removed paragraph remove that paragraph first. */
+  function removeCaretParagraph(direction: 'backward' | 'forward'): boolean {
+    const edit = hiddenMarks.removedCaretEdit(selection.head, direction);
+    if (edit === null) return false;
+    const after = () => collapsedAt(edit.caret);
+    commit(() => applyOps(edit.ops, selectionMark(), caretMark(edit.caret)), after);
+    return true;
   }
 
   function caretMark(position: { paragraphId: string; offset: number }): {
@@ -3029,6 +3009,7 @@ export function mountPaginatedSurface(
   }
 
   function commit(...args: Parameters<typeof commitNow>): void {
+    if (refreshWriteBlocked(container)) return;
     const finish = beginSurfaceCommit(container);
     try {
       commitNow(...args);
@@ -3073,59 +3054,76 @@ export function mountPaginatedSurface(
     // Ops go through the session, so the tree stays the only state. A refusal is surfaced
     // rather than silently dropped: the view is repainted from what the model actually
     // holds, so the user never keeps looking at an edit that will not be saved.
-    const result = commitHistoryGroup.around(surface, run, (r) =>
-      typeof r === 'boolean' ? r : r.committed
-    );
-    const rejection = typeof result === 'boolean' || !result.rejected ? null : result;
-    if (rejection) {
-      lastRejection = writeRejectionReason(
-        String(rejection.reason ?? 'rejected'),
-        session.settingsRoot()
+    // Open until the post-edit caret is installed: the review, automation and undo selection
+    // thunks read layout too. A throw skips `publishAfterCommit`, so it pays an owed paint.
+    commitRunDepth += 1;
+    let refused = false;
+    try {
+      const result = commitHistoryGroup.around(surface, run, (r) =>
+        typeof r === 'boolean' ? r : r.committed
       );
-    } else {
-      lastRejection = null;
-      // The post-edit selection is installed BEFORE the paint, so the single render below
-      // paints the new pages, mirrors the new caret into the DOM and reports one state
-      // change. Committing first and calling `setSelection` afterwards wrote the superseded
-      // caret into the fresh DOM, wrote the browser selection twice, and reported every
-      // edit twice — the second-largest cost of a keystroke after layout, because a host
-      // re-derives toolbar formatting from each report. Supplied as a THUNK evaluated after
-      // the ops: a caret landing in a `w:p` the commit minted cannot be computed before the
-      // commit runs.
-      const next = selectionAfter?.();
-      if (next) {
-        retireActivationPin();
-        selection = next;
-        // An edit placed a TEXT caret — typing beside an anchored image must not ring it.
-        // Image property edits commit with no selectionAfter, so a resize or move drag
-        // keeps its object selection, exactly as Word does.
-        setDrawingIntent({ kind: 'none' }, false);
-        desiredX = null;
-        caretFollowPending = true;
-      }
-      // Re-anchor AFTER the post-edit caret is installed, so the armed format follows the
-      // edit (Backspace moves it one left, Enter moves it into the new paragraph). Only a
-      // collapsed caret can hold one — the same invariant arming enforces.
-      const rearm = options?.rearmPending;
-      if (rearm && rearm.properties.length > 0) {
-        const { anchor, head } = selection;
-        if (anchor.paragraphId === head.paragraphId && anchor.offset === head.offset) {
-          // The new anchor LAST: `armedAtCaret()` hands back the full armed record, and
-          // its stale position must not override where the edit just put the caret.
-          pendingFormats = { properties: rearm.properties, base: rearm.base, position: head };
+      const rejection = typeof result === 'boolean' || !result.rejected ? null : result;
+      refused = rejection !== null;
+      if (rejection) {
+        lastRejection = writeRejectionReason(
+          String(rejection.reason ?? 'rejected'),
+          session.settingsRoot()
+        );
+      } else {
+        lastRejection = null;
+        // The post-edit selection is installed BEFORE the paint, so the single render below
+        // paints the new pages, mirrors the new caret into the DOM and reports one state
+        // change. Committing first and calling `setSelection` afterwards wrote the superseded
+        // caret into the fresh DOM, wrote the browser selection twice, and reported every
+        // edit twice — the second-largest cost of a keystroke after layout, because a host
+        // re-derives toolbar formatting from each report. Supplied as a THUNK evaluated after
+        // the ops: a caret landing in a `w:p` the commit minted cannot be computed before the
+        // commit runs.
+        const next = selectionAfter?.();
+        if (next) {
+          retireActivationPin();
+          selection = next;
+          // An edit placed a TEXT caret — typing beside an anchored image must not ring it.
+          // Image property edits commit with no selectionAfter, so a resize or move drag
+          // keeps its object selection, exactly as Word does.
+          setDrawingIntent({ kind: 'none' }, false);
+          desiredX = null;
+          caretFollowPending = true;
+        }
+        // Re-anchor AFTER the post-edit caret is installed, so the armed format follows the
+        // edit (Backspace moves it one left, Enter moves it into the new paragraph). Only a
+        // collapsed caret can hold one — the same invariant arming enforces.
+        const rearm = options?.rearmPending;
+        if (rearm && rearm.properties.length > 0) {
+          const { anchor, head } = selection;
+          if (anchor.paragraphId === head.paragraphId && anchor.offset === head.offset) {
+            // The new anchor LAST: `armedAtCaret()` hands back the full armed record, and
+            // its stale position must not override where the edit just put the caret.
+            pendingFormats = { properties: rearm.properties, base: rearm.base, position: head };
+          }
         }
       }
+      // An edit moves the caret, and a caret move is presence. Published HERE rather than from
+      // the paint: under input pressure `publishAfterCommit` hands layout to a later task, and
+      // a remote caret must not wait on this author's repaint to stop pointing at a position
+      // they have left.
+      publishLocalCollaborationSelection();
+    } catch (error) {
+      if ((commitRunDepth -= 1) === 0 && commitPaintOwed) {
+        try {
+          render();
+        } catch {
+          // Report the commit's own error, not the paint's.
+        }
+      }
+      throw error;
     }
-    // An edit moves the caret, and a caret move is presence. Published HERE rather than from
-    // the paint: under input pressure `publishAfterCommit` hands layout to a later task, and
-    // a remote caret must not wait on this author's repaint to stop pointing at a position
-    // they have left.
-    publishLocalCollaborationSelection();
+    commitRunDepth -= 1;
     // A committed edit repaints through the scheduler's publish; a REFUSED one commits
     // nothing, so the surface still has to refresh the state it just changed. Under input
     // pressure the publish may hand layout+paint to the scheduler's own task — see
     // `publishAfterCommit`.
-    publishAfterCommit(rejection !== null);
+    publishAfterCommit(refused);
   }
 
   /**
@@ -4293,6 +4291,7 @@ export function mountPaginatedSurface(
     flushPendingInputAndLayout,
     trackedAuthorOrNone,
     atParagraphEnd: (paragraphId, offset) => nextStyle.atParagraphEnd(paragraphId, offset),
+    revisionView,
   });
 
   // Clipboard glue over the payload builder and the paste router. Also above the surface
@@ -4390,6 +4389,7 @@ export function mountPaginatedSurface(
         commentRectCache = null;
         scheduler.invalidateAll(session.packageRevision(), 'zoom');
         scheduler.flush();
+        payOwedPaint();
         if (scroller && anchor) {
           const targetLeft = Math.max(
             0,
@@ -4491,10 +4491,11 @@ export function mountPaginatedSurface(
         );
         return;
       }
+      if (removeCaretParagraph('backward')) return;
       // Word keeps the typing format across Backspace: bold armed at a caret survives
       // deleting the character before it, re-anchored where the caret lands.
       const armed = armedAtCaret() ?? undefined;
-      const position = selection.head;
+      const position = hiddenMarks.shown(selection.head);
       if (position.offset === 0) {
         // Backspace at the start of a paragraph pulls it into the previous one. Refusing
         // here made the key look broken: a caret at the paragraph start is where a user
@@ -4536,18 +4537,15 @@ export function mountPaginatedSurface(
         // the surface, where a host that surfaces refusals reported an error for an ordinary
         // Backspace. Word moves the caret into the last cell instead; doing nothing is the
         // half of that this lane can honestly promise.
-        if (!joinableSiblings(previous, position.paragraphId)) {
+        const joins = hiddenMarks.joinOps(previous, position.paragraphId);
+        if (!joins) {
           setSelection(collapsedAt({ paragraphId: previous, offset: textOf(previous).length }));
           return;
         }
         const joinAt = textOf(previous).length;
         commit(
           () =>
-            applyOps(
-              [{ op: 'joinParagraphs', firstId: previous, secondId: position.paragraphId }],
-              selectionMark(),
-              caretMark({ paragraphId: previous, offset: joinAt })
-            ),
+            applyOps(joins, selectionMark(), caretMark({ paragraphId: previous, offset: joinAt })),
           () => collapsedAt({ paragraphId: previous, offset: joinAt }),
           { rearmPending: armed }
         );
@@ -4730,7 +4728,7 @@ export function mountPaginatedSurface(
       }
       let moved = navigateInActiveScope(
         currentLayout,
-        selection.head,
+        hiddenMarks.shown(selection.head),
         command,
         desiredX,
         hfScope?.getActive() ?? null,
@@ -4797,7 +4795,8 @@ export function mountPaginatedSurface(
       ) {
         noteOps.setActiveNotePageIndex(moved.pageIndex);
       }
-      const target = { anchor: extend ? selection.anchor : moved.position, head: moved.position };
+      const anchor = extend ? hiddenMarks.shown(selection.anchor) : moved.position;
+      const target = { anchor, head: moved.position };
       // A prompt is one unit for the caret, as in Word: arrowing into it selects the whole
       // prompt rather than parking the caret inside text the first keystroke replaces, which
       // left the buffered keystrokes after it aimed past the end of the shortened paragraph.
@@ -4870,11 +4869,11 @@ export function mountPaginatedSurface(
 
     deleteForward() {
       if (textFormInteraction?.selectForDeletion('forward')) return;
-      if (surface.deleteSelection()) return;
+      if (surface.deleteSelection() || removeCaretParagraph('forward')) return;
       // Delete keeps the typing format like Backspace does — the caret does not move, so
       // the armed format re-anchors in place.
       const armed = armedAtCaret() ?? undefined;
-      const position = selection.head;
+      const position = hiddenMarks.shown(selection.head);
       const text = textOf(position.paragraphId);
       if (position.offset < text.length) {
         // Delete at a chip's leading edge takes the WHOLE node — the forward mirror of
@@ -4933,7 +4932,9 @@ export function mountPaginatedSurface(
       commit(
         () =>
           applyOps(
-            [{ op: 'joinParagraphs', firstId: position.paragraphId, secondId: next }],
+            hiddenMarks.forwardJoinOps(position.paragraphId, next) ?? [
+              { op: 'joinParagraphs', firstId: position.paragraphId, secondId: next },
+            ],
             selectionMark()
           ),
         () => collapsedAt(position),
@@ -5249,6 +5250,7 @@ export function mountPaginatedSurface(
     setTranslate: (next) => {
       if (translate === next) return;
       translate = next;
+      setSurfaceAccessibleLabel(pagesLayer, next);
       textFormInteraction?.update();
     },
     setTocLabels: (labels) => {
@@ -5429,7 +5431,7 @@ export function mountPaginatedSurface(
       // Undo is a WRITE. It reached the session directly, so a document the toolbar called
       // read-only silently rewound under the reader's hands — the one lane that walked past
       // `applyOps`, `applyPmDoc` and `commitReviewOps` alike.
-      if (editingMode === 'view') {
+      if (editingMode === 'view' || refreshWriteBlocked(container)) {
         lastRejection = VIEWING_REFUSAL;
         options.onChange?.(currentState());
         return;
@@ -5446,7 +5448,7 @@ export function mountPaginatedSurface(
       if (session.packageRevision() !== revision) restoreSelection(mark);
     },
     redo: () => {
-      if (editingMode === 'view') {
+      if (editingMode === 'view' || refreshWriteBlocked(container)) {
         lastRejection = VIEWING_REFUSAL;
         options.onChange?.(currentState());
         return;
@@ -5786,6 +5788,7 @@ export function mountPaginatedSurface(
   ): boolean {
     const scroller = surfaceScroller(container);
     if (!scroller || scroller.clientHeight === 0) return false;
+    payOwedPaint();
     const top = contentY * scale + container.offsetTop;
     const height = contentHeight * scale;
     const padding = options?.offsetPx ?? 24;
@@ -6101,7 +6104,7 @@ export function mountPaginatedSurface(
         return currentLayout;
       },
       measurer: () => measurer,
-      selection: () => selection,
+      selection: () => hiddenMarks.shownSelection(selection),
       // `none`: a press lands where the reader LOOKS, and moving the paper under a double
       // click sent its second press elsewhere — a blank footer band never opened.
       setSelection: (next) => setSelection(next, false, 'none'),
@@ -6281,5 +6284,6 @@ export function mountPaginatedSurface(
       scheduler.flush();
     }
   );
+  registerRefreshComposition(surface, () => selectionSync.isComposing());
   return { ok: true, surface };
 }

@@ -34,7 +34,28 @@
     "insertFootnote": "Sisipkan catatan kaki",
     "insertEndnote": "Sisipkan catatan akhir",
     "insertTable": null,
-    "review": null
+    "review": null,
+    "export": null,
+    "exportFailed": null,
+    "exportMarkdown": null,
+    "exportMarkdownMissing": null,
+    "exportPdf": null,
+    "exportPdfMissing": null,
+    "exportPdfServerUnavailable": null,
+    "exportContinueEditing": null,
+    "exportDownloadHint": null,
+    "exportMarkdownFailed": null,
+    "exportPdfFailed": null,
+    "exportingMarkdown": null,
+    "exportingPdf": null,
+    "printFailed": null,
+    "printFailedMessage": null,
+    "printOpenPdf": null,
+    "printPdfMissing": null,
+    "printPreparing": null,
+    "printNoViewer": null,
+    "printLoadFailed": null,
+    "printRefused": null
   },
   "formattingBar": {
     "groups": {
@@ -79,7 +100,8 @@
     "imageWrap": "Bungkus teks",
     "formatPainter": null,
     "formatPainterShortcut": null,
-    "paragraphMarks": null
+    "paragraphMarks": null,
+    "label": null
   },
   "alignment": {
     "alignLeft": "Rata Kiri",
@@ -522,7 +544,9 @@
   "editor": {
     "showDocumentOutline": "Tampilkan Kerangka Dokumen",
     "linkCopied": "Tautan disalin ke papan klip",
-    "fontSubstitutionNotice": "Beberapa font dalam dokumen ini tidak tersedia, jadi font pengganti ditampilkan: {fonts}"
+    "fontSubstitutionNotice": "Beberapa font dalam dokumen ini tidak tersedia, jadi font pengganti ditampilkan: {fonts}",
+    "documentContent": null,
+    "documentViewport": null
   },
   "hyperlinkPopup": {
     "displayTextPlaceholder": "Teks yang ditampilkan",
@@ -916,5 +940,43 @@
     "lowercase": null,
     "firstCapital": null,
     "titleCase": null
+  },
+  "documentRefresh": {
+    "cancel": null,
+    "cancelled": null,
+    "capturing": null,
+    "clear": null,
+    "complete": null,
+    "count": null,
+    "delivery": null,
+    "description": null,
+    "download": null,
+    "empty": null,
+    "failed": null,
+    "idle": null,
+    "invalidDocument": null,
+    "limitations": null,
+    "loadError": null,
+    "localEdits": null,
+    "next": null,
+    "partial": null,
+    "position": null,
+    "previous": null,
+    "processing": null,
+    "recovering": null,
+    "recoveryFailed": null,
+    "refreshing": null,
+    "reset": null,
+    "retry": null,
+    "review": null,
+    "show": null,
+    "start": null,
+    "title": null,
+    "unavailable": null,
+    "sampleDescription": null,
+    "scrollToChange": null,
+    "scrolled": null,
+    "processingLabel": null,
+    "sampleEdited": null
   }
 }

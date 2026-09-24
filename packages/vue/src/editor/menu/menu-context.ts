@@ -1,3 +1,4 @@
+import type { ChromeExportFormat } from '@docx-editor.dev/core/editor';
 import { computed, inject, unref, type ComputedRef, type InjectionKey, type MaybeRef } from 'vue';
 import { useTranslation, type TranslationKey } from '../../i18n';
 import type { ChromeMenuId } from '@docx-editor.dev/core/editor';
@@ -7,6 +8,10 @@ import type { ToolbarTranslate } from '../toolbar/toolbar-context';
 export type MenuId = ChromeMenuId | (string & {});
 
 export interface MenuContextValue {
+  readonly onExport?: (format: ChromeExportFormat) => void;
+  readonly onPrint?: () => void;
+  /** Whether the print row shows its shortcut: the editor handles it only with a PDF handler. */
+  readonly printShortcut?: boolean;
   readonly t: ToolbarTranslate | undefined;
   readonly openMenu: MenuId | null;
   readonly setOpenMenu: (id: MenuId | null) => void;

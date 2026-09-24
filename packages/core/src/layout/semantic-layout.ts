@@ -1,4 +1,8 @@
-import { contextualParagraphSpacing } from './contextual-paragraph-spacing.ts';
+import {
+  contextualFlowInputs,
+  contextualParagraphSpacing,
+  flowNeighbourStyle,
+} from './contextual-paragraph-spacing.ts';
 import { resolveParagraphFrame } from './paragraph-drop-cap.ts';
 import {
   anchorLineSkipsExclusion,
@@ -16,7 +20,7 @@ import { paragraphIsRtl, spanContentX } from './rtl-paragraph.ts';
 import * as sectionPrep from './section-preparation.ts';
 import { resolveListAutoSpacing, listAutoSpacingFlowKeys } from './list-auto-spacing.ts';
 import { emptyParagraphStyleFields } from './empty-paragraph-style.ts';
-import { positionedFrameBottom, type ParagraphFrame } from './paragraph-frame.ts';
+import { positionedFrameBottom } from './paragraph-frame.ts';
 import { ParagraphFrameFlow, paragraphFrameFlowKeys } from './paragraph-frame-flow.ts';
 // Semantic paragraph layout over the canonical tree (tasks 7.1, 7.3).
 //
@@ -29,12 +33,7 @@ import { ParagraphFrameFlow, paragraphFrameFlowKeys } from './paragraph-frame-fl
 // paragraph id. That is what makes a cross-page paragraph one paragraph for selection and
 // two boxes for pagination.
 
-import type {
-  OoxmlElement,
-  OoxmlNode,
-  OoxmlPart,
-  OoxmlProperty,
-} from '@docx-editor.dev/core/store';
+import type { OoxmlElement, OoxmlNode, OoxmlPart } from '@docx-editor.dev/core/store';
 import { WML_MAIN_DOCUMENT_PART } from '../store/package/opc-names.ts';
 import {
   finalizePageFieldProjection,
@@ -55,7 +54,6 @@ import {
   alignDrawings,
   lineAlignmentMeasure,
   pendingLineFlowExtentAtPlacement,
-  type Alignment,
   type PendingLine,
 } from './paragraph-flow.ts';
 import {
@@ -69,9 +67,6 @@ import {
   paragraphBorderStrokeWidthPt,
   collapsedSpaceBefore,
   paragraphBreaksBefore,
-  type ParagraphBorders,
-  type ParagraphLineSpacing,
-  type ParagraphSpacing,
 } from './paragraph-style.ts';
 import {
   adjustedBreakIndex,
@@ -79,24 +74,27 @@ import {
   keepNextGroupHeight,
   paragraphKeeps,
   MAX_KEEP_NEXT_CHAIN,
-  type ParagraphKeeps,
 } from './pagination-keeps.ts';
 import { DEFAULT_RUN_STYLE, resolveRunStyle } from './run-style.ts';
-import type { ResolvedTabStops } from './paragraph-tabs.ts';
 import {
   prepareParagraphBreakInputs,
   bodyParagraphBreakKey,
   breakPreparedParagraph,
   createParagraphBreakRetention,
 } from './paragraph-break-request.ts';
-import { resolveParagraphLayoutInputs, type StyleCascadeTable } from './style-cascade.ts';
+import { resolveParagraphLayoutInputs } from './style-cascade.ts';
 import { paragraphBorderGroupKey } from './cell-border-groups.ts';
 import { paragraphShadingBox } from './ooxml-shading.ts';
 import { type TableAnchorFrames } from './semantic-table.ts';
 import * as tableFloat from './table-float-position.ts';
 import * as tableWrap from './table-float-exclusion.ts';
 import * as frameWrap from './paragraph-frame-exclusion.ts';
-import { bodyAnchorFrameBase, paragraphPaintsNothing } from './body-flow-helpers.ts';
+import {
+  bodyAnchorFrameBase,
+  paragraphHoldsNothing,
+  paragraphPaintsNothing,
+} from './body-flow-helpers.ts';
+import { resolveOverlapDisplacement, shiftAnchoredDrawingY } from './drawing-overlap.ts';
 import {
   createTableBorderOwnershipBudget,
   createTableVMergeResolveBudget,
@@ -126,8 +124,6 @@ import {
   exclusionMapsEqual,
   exclusionMapsToken,
   MAX_ANCHOR_PAGE_DEFERRALS,
-  resolveOverlapDisplacement,
-  shiftAnchoredDrawingY,
   sortDrawingsForPaint,
   topAndBottomSkipBeforeLine,
   withAnchoredDrawingLayoutFallback,
@@ -191,12 +187,7 @@ import {
   type ParagraphBottomBorderRecord,
   type SemanticLayout,
 } from './semantic-records.ts';
-import type { NumberingIndex } from './numbering-index.ts';
-import {
-  withResolvedListItems,
-  withResolvedListItemsForSession,
-  type ResolvedListItem,
-} from './list-resolve.ts';
+import { withResolvedListItems, withResolvedListItemsForSession } from './list-resolve.ts';
 import { noteRefNumberingFromNotes } from './field-noteref.ts';
 import { refTokenForTableBlock, resolveStoryRefFieldsWithNoteNumbers } from './field-ref.ts';
 import { createListFirstLineMetrics, publishListMarker } from './list-marker.ts';
@@ -224,46 +215,13 @@ export { type HeaderFooterVariantName, type PageFurniture } from './page-furnitu
 
 import type { SemanticLayoutOptions } from './semantic-layout-options.ts';
 export type { SemanticLayoutOptions } from './semantic-layout-options.ts';
+import type { PreparedBlock, SectionPrepass } from './section-prepass-types.ts';
+export type { SectionPrepass } from './section-prepass-types.ts';
 
 type BlockLayoutOptions = ColumnBalanceBlockLayoutOptions<SemanticLayoutOptions> & {
   readonly disabledParagraphFrameIds?: ReadonlySet<string>;
   readonly paragraphFrameFallbackRound?: number;
 };
-
-/** Prepass results by block node, valid while the width and producer both hold. */
-type PreparedBlock =
-  | {
-      readonly kind: 'paragraph';
-      readonly frame?: ParagraphFrame;
-      readonly paragraph: OoxmlElement;
-      readonly props: OoxmlProperty[];
-      readonly indent: { left: number; right: number; hanging: number; firstLine: number };
-      readonly available: number;
-      readonly alignment: Alignment;
-      readonly spacing: ParagraphSpacing;
-      readonly lineSpacing: ParagraphLineSpacing;
-      readonly contextualSpacing: boolean;
-      readonly styleId: string | null;
-      readonly outlineLevel: number | null;
-      readonly borders: ParagraphBorders;
-      /**
-       * Border identity + indent, for the `w:between` group rule.
-       *
-       * Indent participates because a group whose members sit at different indents would need
-       * a stepped outline; splitting the group there gives each member its own closed box,
-       * which is the near miss rather than a rule drawn through the text.
-       */
-      readonly borderGroupKey: string;
-      readonly shading: string | undefined;
-      readonly inheritedRunProperties: readonly OoxmlProperty[];
-      readonly markRunProperties: readonly OoxmlProperty[];
-      readonly tabStops: ResolvedTabStops;
-      /** `w:widowControl` / `w:keepNext` / `w:keepLines`, after the style cascade. */
-      readonly keeps: ParagraphKeeps;
-      readonly listItem?: ResolvedListItem;
-      readonly key: string;
-    }
-  | { readonly kind: 'table'; readonly table: OoxmlElement; readonly key: string };
 
 interface PreparedBlockMemo {
   readonly contentWidth: number;
@@ -297,44 +255,6 @@ interface PreparedBlockMemo {
 }
 
 const preparedBlocks = new WeakMap<OoxmlNode, PreparedBlockMemo>();
-
-/**
- * One section's whole prepass — prepared entries, cache keys, flow keys and document
- * order — kept on the section's {@link LayoutSession} and reused verbatim while every
- * input it derives from is unchanged. Stored through the session's opaque `prepass` slot.
- */
-export interface SectionPrepass {
-  /** Frame admission depends on column policy and probe-disabled paragraph IDs. */
-  readonly framePolicy: string;
-  readonly bodies: readonly OoxmlElement[];
-  readonly producer: string;
-  readonly contentWidth: number;
-  readonly styleCascade: StyleCascadeTable | undefined;
-  readonly listItems: ReadonlyMap<string, ResolvedListItem> | undefined;
-  /**
-   * The numbering index `hostedTextboxListToken` reads. Compared by IDENTITY: a story with
-   * no numbered paragraphs of its own can host a text box whose list a numbering edit
-   * renumbers, and then `listItems` is the same (empty) map while every hosted token in
-   * `entry.key` is stale.
-   */
-  readonly numberingIndex: NumberingIndex | undefined;
-  readonly drawingEpoch: string;
-  readonly projectionEpoch: string;
-  readonly prepared: PreparedBlock[];
-  readonly keys: string[];
-  readonly paragraphDocumentOrder: ReadonlyMap<string, number>;
-  readonly keepsNext: boolean[];
-  readonly markerTexts: (string | undefined)[];
-  readonly tocToken: string;
-  /**
-   * The story-wide REF values token. Compared WHOLE, like {@link tocToken} and for the same
-   * shape of reason: a renumbering edit in one section moves a REF value painted in another
-   * whose blocks and list map are identity-unchanged, so no per-section input sees it.
-   */
-  readonly refToken: string;
-  readonly flowKeys: string[];
-  readonly terminalTextTables: terminalTables.TerminalTextTableGroup | undefined;
-}
 
 /**
  * Lay one story part out into pages.
@@ -819,6 +739,7 @@ function layoutBlocksPass(
     columns,
     columnRegionBottom,
     sectionPageBorders: options.sectionPageBorders,
+    sectionMarkCollapses: options.sectionMarkCollapses,
   });
   const context = contextFor(
     notesReserveContextKey(pageBottomReserves, pageIndexStart, reserveKeyBound)
@@ -1192,7 +1113,8 @@ function layoutBlocksPass(
       sectionPrep.prepareSectionBlocks(bodies, reusable, (block) =>
         prepareBlock(block, contentWidth)
       ),
-      options.paragraphLineUnitPt
+      options.paragraphLineUnitPt,
+      styleCascade
     );
     const keys = prepared.map((entry) => entry.key);
     const terminalTextTables = terminalTables.terminalTextTableGroup(
@@ -1206,14 +1128,6 @@ function layoutBlocksPass(
     const keepsNext = prepared.map((entry) => entry.kind === 'paragraph' && entry.keeps.keepNext);
     const markerTexts = prepared.map((entry) =>
       entry.kind === 'paragraph' ? listItems?.get(entry.paragraph.id)?.markerText : undefined
-    );
-    // The two inputs `w:contextualSpacing` reads from the blocks on either side. A table
-    // answers null, which is what `sameStyleAs` means by "not a paragraph of this style".
-    const contextualSpacings = prepared.map(
-      (entry) => entry.kind === 'paragraph' && entry.contextualSpacing
-    );
-    const styleIds = prepared.map((entry) =>
-      entry.kind === 'paragraph' ? (entry.styleId ?? '') : null
     );
     // A paragraph's bottom edge belongs to its border GROUP, which the block after it can
     // join or leave. A table never groups, and neither does a paragraph with no borders.
@@ -1237,8 +1151,7 @@ function layoutBlocksPass(
       listAutoSpacingFlowKeys(paragraphFrameFlowKeys(keys, prepared), prepared),
       {
         terminalTableGroup: terminalTextTables,
-        contextualSpacingAt: (index) => contextualSpacings[index]!,
-        styleIdAt: (index) => styleIds[index] ?? null,
+        ...contextualFlowInputs(prepared, styleCascade),
         borderGroupKeyAt: (index) => borderGroupKeys[index]!,
         tocVerdicts,
         markerTextAt: (index) => markerTexts[index],
@@ -1527,9 +1440,7 @@ function layoutBlocksPass(
       );
     }
     if (!options.inlineDrawingLayout) return;
-    const resolved = resolveOverlapDisplacement(pendingAnchoredDrawings, {
-      pageBottom: contentHeight(),
-    });
+    const resolved = resolveOverlapDisplacement(pendingAnchoredDrawings, anchorFrameBase());
     pendingAnchoredDrawings.splice(0, pendingAnchoredDrawings.length, ...resolved.drawings);
     if (resolved.deferred.length > 0) {
       for (const drawing of resolved.deferred) {
@@ -1737,9 +1648,8 @@ function layoutBlocksPass(
     if (placedParagraphStartY === undefined && startOffset === 0 && !entry.frame) {
       const previous = prepared[entryIndex - 1];
       const sameStyle =
-        previous?.kind === 'paragraph' &&
         entry.styleId !== null &&
-        previous.styleId === entry.styleId;
+        flowNeighbourStyle(entry.paragraph, -1, previous, styleCascade) === entry.styleId;
       const before = entry.contextualSpacing && sameStyle ? 0 : entry.spacing.before;
       const continuesBorder =
         entry.borderGroupKey !== '' &&
@@ -1899,6 +1809,9 @@ function layoutBlocksPass(
     return Math.max(live, breakSkip);
   };
 
+  const tableVerticalFrames = (anchorY: number) =>
+    tableFloat.bodyTableVerticalAnchorFrames(anchorFrameBase(), anchorY, geometry.margin.top);
+
   const layoutTableInFlow = (
     table: OoxmlElement,
     anchorY = cursorY,
@@ -1919,8 +1832,7 @@ function layoutBlocksPass(
         flow.cursorY = cursorY;
       },
       anchorFrames,
-      verticalAnchorFrames: () =>
-        tableFloat.bodyTableVerticalAnchorFrames(anchorFrameBase(), anchorY, geometry.margin.top),
+      verticalAnchorFrames: () => tableVerticalFrames(anchorY),
       styleCascade,
       displayMode,
       ...(authorFilter ? { revisionAuthorFilter: authorFilter } : {}),
@@ -1967,6 +1879,23 @@ function layoutBlocksPass(
         }
       }
     );
+  // Before a continuous section, the empty mark that ends this one is out of flow: no line,
+  // no spacing. Its fragment stays for caret and selection, but it moves nothing.
+  const collapsesSectionMark = (at: number, lines?: readonly PendingLine[]): boolean => {
+    const mark = prepared[at];
+    return (
+      options.sectionMarkCollapses === true &&
+      // A mark that is its section's only block IS the section's content: it keeps its line.
+      at > 0 &&
+      at === prepared.length - 1 &&
+      mark?.kind === 'paragraph' &&
+      !mark.frame &&
+      !paragraphBreaksBefore(mark.props) &&
+      paragraphSectionNode(mark.paragraph) !== undefined &&
+      (listItems?.get(mark.paragraph.id) ?? mark.listItem) === undefined &&
+      paragraphHoldsNothing(mark, lines ?? breakBlock(mark, at), options.inlineDrawingLayout)
+    );
+  };
   let converged = false;
   let convergedAt = prepared.length;
   /** Whole pages the convergence tail moved by; reused checkpoints shift with it. */
@@ -2060,20 +1989,12 @@ function layoutBlocksPass(
               authorFilter,
             });
             if (placed) {
-              for (const fragment of placed.fragments) {
-                const source = positionedTables.find(
-                  (entry) => entry.table.id === fragment.tableId
-                )!;
-                pageFragments.push({
-                  ...fragment,
-                  floatingWrap: {
-                    anchorId: source.anchorId,
-                    columnIndex: flowColumnIndex,
-                    float: source.float,
-                    sourceOrder: source.sourceIndex,
-                  },
-                });
-              }
+              const tagged = terminalTables.withTerminalFloatingWrap(
+                placed.fragments,
+                positionedTables,
+                flowColumnIndex
+              );
+              for (const fragment of tagged) pageFragments.push(fragment);
               for (const [memberIndex, table] of terminalTextTables.tables.entries()) {
                 terminalTextTableIds.add(table.id);
                 registerTableCellBreakKeys(table, placed.cellBreakKeys[memberIndex]!);
@@ -2119,18 +2040,8 @@ function layoutBlocksPass(
     let { indent, alignment, markRunProperties } = entry;
     const rtl = paragraphIsRtl(entry.props);
     let available = entry.available;
-    // `w:contextualSpacing` (17.3.1.9) drops the gap between paragraphs of the SAME style.
-    // Word's own ListParagraph sets it, so without this every Word-authored list carries a
-    // paragraph gap between its items.
     const previousEntry = index > 0 ? prepared[index - 1] : undefined;
     const nextEntry = prepared[index + 1];
-    const spacing = contextualParagraphSpacing(
-      authoredSpacing,
-      contextualSpacing,
-      styleId,
-      previousEntry?.kind === 'paragraph' ? previousEntry.styleId : undefined,
-      nextEntry?.kind === 'paragraph' ? nextEntry.styleId : undefined
-    );
     const listItem = listItems?.get(paragraph.id) ?? entry.listItem;
     // `w:firstLine` moves the first line right of the indent, `w:hanging` moves it left.
     // The schema treats them as mutually exclusive; where a producer writes both, hanging
@@ -2186,10 +2097,21 @@ function layoutBlocksPass(
     }
     // A blank paragraph-level `w:sectPr` is the section break, not content. It cannot open a
     // sheet merely because its line misses the bottom; the next section's break owns that.
-    const marksSectionBreak =
-      paragraphSectionNode(paragraph) !== undefined && paintsNothing(entry, lines);
+    const sectionMark = paragraphSectionNode(paragraph) !== undefined;
+    const marksSectionBreak = sectionMark && paintsNothing(entry, lines);
+    const collapsedMark = sectionMark && !frame && collapsesSectionMark(index, lines);
     const holdsSheet = (): boolean =>
-      marksSectionBreak && columnRegionBottom === undefined && columnIndex + 1 >= columns.count;
+      collapsedMark ||
+      (marksSectionBreak && columnRegionBottom === undefined && columnIndex + 1 >= columns.count);
+    // `w:contextualSpacing` (17.3.1.9) drops the gap between paragraphs of the SAME style.
+    // ListParagraph styles can set it to suppress paragraph gaps between list items.
+    const spacing = contextualParagraphSpacing(
+      collapsedMark ? { before: 0, after: 0 } : authoredSpacing,
+      contextualSpacing,
+      styleId,
+      flowNeighbourStyle(paragraph, -1, previousEntry, styleCascade),
+      flowNeighbourStyle(paragraph, 1, nextEntry, styleCascade)
+    );
     const rebreakInCurrentColumn = (startOffset: number, placedParagraphStartY?: number): void => {
       const next = prepareBlock(paragraph, columnWidth());
       if (next.kind !== 'paragraph') return;
@@ -2206,7 +2128,8 @@ function layoutBlocksPass(
       measureBackwardWrap(startOffset, placedParagraphStartY);
     };
 
-    const savedFrameFlow = frame ? { cursorY, previousSpaceAfter, firstParagraphOfSection } : null;
+    const savedFrameFlow =
+      frame || collapsedMark ? { cursorY, previousSpaceAfter, firstParagraphOfSection } : null;
     const frameStart = frame
       ? paragraphFrames.start(
           frame,
@@ -2255,7 +2178,13 @@ function layoutBlocksPass(
             paragraphId,
             columnWidth(),
             tableDeps,
-            { anchorY: prospectiveFirstTop, frames: anchorFrames(), earlier: pageFragments }
+            {
+              anchorY: prospectiveFirstTop,
+              anchorExtent: firstExtent,
+              frames: anchorFrames(),
+              verticalFrames: tableVerticalFrames(prospectiveFirstTop),
+              earlier: pageFragments,
+            }
           )
         );
       // `w:keepNext` (§17.3.1.15): this paragraph may not be the last thing on its page. Priced
@@ -2275,7 +2204,8 @@ function layoutBlocksPass(
             const member = prepareBlock(bodies[at]!, columnWidth());
             return member.kind === 'paragraph' ? breakBlock(member, at).map((l) => l.height) : [];
           },
-          (at) => prepared[at]?.kind === 'paragraph' && !!prepared[at].frame
+          (at) =>
+            prepared[at]?.kind === 'paragraph' && (!!prepared[at].frame || collapsesSectionMark(at))
         );
         if (group !== null && group + topExtent <= contentHeight()) {
           needed = Math.max(needed, group + topExtent);
@@ -2521,7 +2451,8 @@ function layoutBlocksPass(
         indent,
         ...(bottomBorderRecord ? { bottomBorder: bottomBorderRecord } : {}),
         ...(strokes.length > 0 ? { borders: strokes } : {}),
-        ...(shading === undefined
+        ...(collapsedMark ? { outOfFlow: true as const } : {}),
+        ...(shading === undefined || collapsedMark
           ? {}
           : {
               shading,
@@ -2647,6 +2578,7 @@ function layoutBlocksPass(
             columnBox: publishColumnBox,
             cellBox: null,
             pageClip: pageContentClip(),
+            cellAnchorScope: null,
             measurer,
             sourceOrderOf,
             // The drawing-context guard above is the same predicate that creates this bundle.

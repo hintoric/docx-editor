@@ -42,6 +42,7 @@ import {
 } from './semantic-table.ts';
 import { tableFloatOriginY, type TableVerticalAnchorFrames } from './table-float-position.ts';
 import { shiftBlocks } from './table-fragment-finalize.ts';
+import { planOutOfCellFloats } from './table-out-of-cell-floats.ts';
 import type { StyleCascadeTable } from './style-cascade.ts';
 import type { RevisionAuthorFilter, RevisionDisplayMode } from './revision-projection.ts';
 import type {
@@ -110,8 +111,9 @@ const POSITIONED_TABLE_LAYOUT_BOTTOM_PT = Number.MAX_SAFE_INTEGER / 1024;
  *
  * Preflights the real unsplit row height (not a one-line estimate). Splittable rows use
  * the current remainder, even when they could fit whole on a fresh page. Atomic rows
- * move whole; `w:cantSplit` and unsafe nested
- * cuts fail closed via {@link TablePaginationError} instead of overflowing contentHeight().
+ * move whole; a `w:cantSplit` row taller than a page moves to a fresh page and splits there.
+ * Exact rows taller than a page and unsafe nested cuts fail closed via
+ * {@link TablePaginationError} instead of overflowing contentHeight().
  * Contiguous leading `w:tblHeader` rows form one atomic repeated group: preflighted and
  * placed together, moved whole when the remainder is too short, re-emitted complete atop
  * each continuation page where the pending row can advance, and treated as ordinary rows
@@ -131,7 +133,7 @@ export function paginateTableInFlow(
     styleCascade,
     displayMode,
     revisionAuthorFilter,
-    deps: tableDeps,
+    deps: flowDeps,
     shiftAnchor,
     publishFragment,
   } = flow;
@@ -178,17 +180,29 @@ export function paginateTableInFlow(
     flow.cursorY = tableFloatOriginY(structure.float, 0, verticalFrames);
   }
   /** One row's natural height where the table stands now. `tableLeft` moves; this reads it. */
-  const rowHeightOf = (probeRow: SemanticTableRow, top = flow.cursorY, deps = tableDeps): number =>
+  const rowHeightOf = (
+    probeRow: SemanticTableRow,
+    top = flow.cursorY,
+    deps?: TableFlowDeps
+  ): number =>
     measureRowHeight(
       probeRow,
       structure.columnWidthsPt,
       tableLeft,
       0,
-      deps,
+      deps ?? tableDeps,
       structure.cellSpacingPt,
       undefined,
       tableDeps.pageExclusionZones?.().length ? top : undefined
     );
+  // Out-of-cell floats (`layoutInCell="0"` before mode 15) keep the place the unpushed table
+  // gives them and push the rows that touch them; see `table-out-of-cell-floats.ts`. Only
+  // an in-flow table's first fragment is pushed: after a break the rows are on another sheet.
+  const floats =
+    outOfFlow || structure.float
+      ? null
+      : planOutOfCellFloats(structure, table.id, tableLeft, flow.cursorY, flowDeps);
+  const tableDeps = floats?.deps ?? flowDeps;
   const headerRows: SemanticTableRow[] = [];
   for (const row of structure.rows) {
     if (row.isHeader) headerRows.push(row);
@@ -221,7 +235,12 @@ export function paginateTableInFlow(
     if (deps.cellContentInsets) occurrenceInsets.set(record, deps.cellContentInsets);
   };
   const closeTableFragment = (): void => {
-    if (rows.length === 0) return;
+    // Every close is a break or the table's end: rows past it are on another sheet. The end
+    // waits for this fragment's finalize, which republishes its floats through the pin.
+    if (rows.length === 0) {
+      floats?.end();
+      return;
+    }
     const index = rows.length - 1;
     const record = rows[index]!;
     const source = sourceRows[index]!;
@@ -308,6 +327,7 @@ export function paginateTableInFlow(
       }
     }
     publishFragment(positionedFragment);
+    floats?.end();
     fragmentIndex += 1;
     rows = [];
     sourceRows = [];
@@ -398,7 +418,18 @@ export function paginateTableInFlow(
   };
 
   // Initial authored header group (not repeats) — atomic with body-row pagination below.
-  if (!initialHeaderGroupDegraded) placeHeaderGroup(false);
+  if (!initialHeaderGroupDegraded) {
+    if (floats) {
+      flow.cursorY = floats.clear(
+        flow.cursorY,
+        () => headerGroupHeight,
+        headerRows,
+        contentHeight()
+      );
+      fragmentTop = flow.cursorY;
+    }
+    placeHeaderGroup(false);
+  }
 
   // `w:vMerge` heights, planned over the BODY rows: a merged cell is as tall as the rows
   // it covers, so its own row must not swallow the whole merged height.
@@ -443,6 +474,14 @@ export function paginateTableInFlow(
     if (initialHeaderGroupDegraded && bodyRowIndex >= headerRows.length) repeatsEnabled = true;
     const forceBreak = forceNextFragment;
     forceNextFragment = false;
+    if (floats) {
+      const firstDeps =
+        rows.length === 0 ? firstRowContentDeps(structure, row, tableDeps) : undefined;
+      const heightAt = (y: number) => rowHeightOf(row, y, firstDeps);
+      flow.cursorY = floats.clear(flow.cursorY, heightAt, [row], contentHeight());
+      // A table pushed before its first row starts where that row now does.
+      if (rows.length === 0) fragmentTop = flow.cursorY;
+    }
     admitSpans(bodyRowIndex, row);
     let terminalDeps: TableFlowDeps | undefined;
     let cursors: CellPlaceCursor[] = initialCellCursors(row);
@@ -476,6 +515,12 @@ export function paginateTableInFlow(
             tableDeps
           );
 
+    // `w:cantSplit` keeps a row whole only when a page can hold it. The full band counts,
+    // because a note reserve yields to a keep-together row on a fresh page (see below).
+    // A taller row starts on a fresh page and then splits like an ordinary row.
+    const pageHoldsRow = (): boolean =>
+      naturalHeight <= Math.max(contentHeight(), flow.unreservedContentHeight?.() ?? 0) + 0.001;
+
     // A row an accepted span covers does not take the whole-row MOVE: alone among the
     // breaks below, that one is an optimization rather than a recovery, and it ends the
     // fragment above merged content already flowed against this page. See the break-site
@@ -497,7 +542,7 @@ export function paginateTableInFlow(
       // authored box is structural progress even though it places no text. Mirror that path before
       // asking the bounded probe, whose `fitted` flag deliberately means content progress.
       if (!isContinuation && naturalHeight <= remaining + 0.001) return true;
-      if (!isContinuation && (row.cantSplit || row.height.rule === 'exact')) {
+      if (!isContinuation && (row.height.rule === 'exact' || (row.cantSplit && pageHoldsRow()))) {
         return false;
       }
       return probeRowFragmentProgress(
@@ -645,7 +690,15 @@ export function paginateTableInFlow(
       // `cursorY === 0` — a fresh page the row was just moved to — and aborts a layout
       // nothing in `core` catches, on a path the module comment calls a recovery.
       if (!isContinuation && (row.cantSplit || row.height.rule === 'exact')) {
-        if (flow.cursorY > 0 && !movedToFreshPage) {
+        const splitsAnyway = row.height.rule !== 'exact' && !pageHoldsRow();
+        // A row that splits anyway gains no room by leaving header rows that already open
+        // the page: repeats, or the authored group at the page top. Moving would strand them
+        // above an empty band. Header rows that start lower on the page still move with it.
+        const belowTopHeadersOnly =
+          rows.length > 0 &&
+          rows.every((placed) => placed.isHeaderRow) &&
+          (fragmentTop <= 0.001 || rows.every((placed) => placed.isHeaderRepeat));
+        if (flow.cursorY > 0 && !movedToFreshPage && !(splitsAnyway && belowTopHeadersOnly)) {
           breakForContinuation(admitsRepeatedHeaders);
           movedToFreshPage = true;
           // Re-offered like every other break that retries this row: a merge starting on a
@@ -685,12 +738,17 @@ export function paginateTableInFlow(
             break;
           }
         }
-        throw new TablePaginationError(
-          'table-row-overheight',
-          row.height.rule === 'exact'
-            ? `Table row ${row.id} has w:trHeight hRule=exact taller than the available page content`
-            : `Table row ${row.id} has w:cantSplit and is taller than the available page content`
-        );
+        // `w:cantSplit` cannot keep a row whole when no page can hold it. The row is now
+        // on a fresh page or below header rows only, so it splits from here like an
+        // ordinary row instead of discarding the document. An exact height cannot split.
+        if (!splitsAnyway) {
+          throw new TablePaginationError(
+            'table-row-overheight',
+            row.height.rule === 'exact'
+              ? `Table row ${row.id} has w:trHeight hRule=exact taller than the available page content`
+              : `Table row ${row.id} has w:cantSplit and is taller than the available page content`
+          );
+        }
       }
 
       const placementDeps = rowDeps();

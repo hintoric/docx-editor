@@ -2,6 +2,7 @@
   "title": "Guides",
   "pages": [
     "loading-and-saving",
+    "document-refresh",
     "toolbar",
     "chrome-slots",
     "customize-dialogs",
@@ -14,6 +15,8 @@
     "images",
     "custom-styles",
     "fonts",
-    "dark-mode"
+    "dark-mode",
+    "export",
+    "print"
   ]
 }

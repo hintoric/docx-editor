@@ -208,6 +208,12 @@
       "emitsAddedInReact": [],
       "emitsAddedInVue": []
     },
+    "editor/DocxEditorExportDialog": {
+      "propsAddedInReact": [],
+      "propsAddedInVue": ["inheritAttrs", "name", "onClose", "props"],
+      "emitsAddedInReact": [],
+      "emitsAddedInVue": ["close"]
+    },
     "editor/DocxEditorFontNotice": {
       "propsAddedInReact": [],
       "propsAddedInVue": ["class", "name", "props", "role"],
@@ -256,6 +262,12 @@
       "propsAddedInVue": ["children", "className", "name", "preset", "props", "style"],
       "emitsAddedInReact": [],
       "emitsAddedInVue": []
+    },
+    "editor/DocxEditorPrintDialog": {
+      "propsAddedInReact": [],
+      "propsAddedInVue": ["inheritAttrs", "name", "onClose", "props"],
+      "emitsAddedInReact": [],
+      "emitsAddedInVue": ["close"]
     },
     "editor/DocxEditorRoot": {
       "propsAddedInReact": [
@@ -332,18 +344,8 @@
       "emitsAddedInVue": []
     },
     "editor/menu/menu-flyouts": {
-      "propsAddedInReact": [],
-      "propsAddedInVue": [
-        "children",
-        "className",
-        "className",
-        "labelKey",
-        "labelKey",
-        "name",
-        "paths",
-        "paths",
-        "props"
-      ],
+      "propsAddedInReact": ["slot"],
+      "propsAddedInVue": ["children", "labelKey", "labelKey", "name", "paths", "paths", "props"],
       "emitsAddedInReact": [],
       "emitsAddedInVue": []
     },

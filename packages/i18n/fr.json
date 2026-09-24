@@ -34,7 +34,28 @@
     "insertFootnote": "Insérer une note de bas de page",
     "insertEndnote": "Insérer une note de fin",
     "insertTable": null,
-    "review": null
+    "review": null,
+    "export": null,
+    "exportFailed": null,
+    "exportMarkdown": null,
+    "exportMarkdownMissing": null,
+    "exportPdf": null,
+    "exportPdfMissing": null,
+    "exportPdfServerUnavailable": null,
+    "exportContinueEditing": null,
+    "exportDownloadHint": null,
+    "exportMarkdownFailed": null,
+    "exportPdfFailed": null,
+    "exportingMarkdown": null,
+    "exportingPdf": null,
+    "printFailed": null,
+    "printFailedMessage": null,
+    "printOpenPdf": null,
+    "printPdfMissing": null,
+    "printPreparing": null,
+    "printNoViewer": null,
+    "printLoadFailed": null,
+    "printRefused": null
   },
   "formattingBar": {
     "groups": {
@@ -79,7 +100,8 @@
     "imageWrap": "Habillage du texte",
     "formatPainter": null,
     "formatPainterShortcut": null,
-    "paragraphMarks": null
+    "paragraphMarks": null,
+    "label": null
   },
   "alignment": {
     "alignLeft": "Aligner à gauche",
@@ -472,7 +494,9 @@
   "editor": {
     "showDocumentOutline": "Afficher le plan",
     "linkCopied": "Lien copié dans le presse-papiers",
-    "fontSubstitutionNotice": "Certaines polices de ce document ne sont pas disponibles ; des polices de substitution sont affichées : {fonts}"
+    "fontSubstitutionNotice": "Certaines polices de ce document ne sont pas disponibles ; des polices de substitution sont affichées : {fonts}",
+    "documentContent": null,
+    "documentViewport": null
   },
   "hyperlinkPopup": {
     "displayTextPlaceholder": "Texte à afficher",
@@ -916,5 +940,43 @@
     "lowercase": null,
     "firstCapital": null,
     "titleCase": null
+  },
+  "documentRefresh": {
+    "cancel": null,
+    "cancelled": null,
+    "capturing": null,
+    "clear": null,
+    "complete": null,
+    "count": null,
+    "delivery": null,
+    "description": null,
+    "download": null,
+    "empty": null,
+    "failed": null,
+    "idle": null,
+    "invalidDocument": null,
+    "limitations": null,
+    "loadError": null,
+    "localEdits": null,
+    "next": null,
+    "partial": null,
+    "position": null,
+    "previous": null,
+    "processing": null,
+    "recovering": null,
+    "recoveryFailed": null,
+    "refreshing": null,
+    "reset": null,
+    "retry": null,
+    "review": null,
+    "show": null,
+    "start": null,
+    "title": null,
+    "unavailable": null,
+    "sampleDescription": null,
+    "scrollToChange": null,
+    "scrolled": null,
+    "processingLabel": null,
+    "sampleEdited": null
   }
 }

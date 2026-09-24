@@ -9,6 +9,8 @@ import { CalendarDay } from '@docx-editor.dev/core/editor';
 import { CalendarMonth } from '@docx-editor.dev/core/editor';
 import { CHROME_GROUPS } from '@docx-editor.dev/core/editor';
 import { CHROME_MENUS } from '@docx-editor.dev/core/editor';
+import { ChromeExportFormat } from '@docx-editor.dev/core/editor';
+import { ChromeExportHandlers } from '@docx-editor.dev/core/editor';
 import { ChromeMenu } from '@docx-editor.dev/core/editor';
 import { ChromeMenuEntry } from '@docx-editor.dev/core/editor';
 import { ChromeMenuId } from '@docx-editor.dev/core/editor';
@@ -17,6 +19,7 @@ import { ChromeMenuSeparatorEntry } from '@docx-editor.dev/core/editor';
 import { chromeMenuSlots } from '@docx-editor.dev/core/editor';
 import { ChromeMenuSubmenuEntry } from '@docx-editor.dev/core/editor';
 import { ChromeSlotId } from '@docx-editor.dev/core/editor';
+import { ClearRefreshHighlightsOptions } from '@docx-editor.dev/core/editor';
 import { ColorValue } from '@docx-editor.dev/core/contracts/editor';
 import { commandForSlot } from '@docx-editor.dev/core/editor';
 import { Component } from 'vue';
@@ -28,11 +31,15 @@ import { ContentControlListNavigation } from '@docx-editor.dev/core/editor';
 import { ContentControlSummary } from '@docx-editor.dev/core';
 import { ContentControlType } from '@docx-editor.dev/core';
 import { ContentControlWidgetSession } from '@docx-editor.dev/core/editor';
+import { createDocumentRefresh } from '@docx-editor.dev/core/editor';
 import { createFontSource } from '@docx-editor.dev/core/editor';
 import { CSSProperties } from 'vue';
 import { defineFontResolver } from '@docx-editor.dev/core/editor';
 import { DocumentChange } from '@docx-editor.dev/core/contracts/editor';
 import { DocumentHandle } from '@docx-editor.dev/core/contracts/editor';
+import { DocumentRefresh } from '@docx-editor.dev/core/editor';
+import { DocumentRefreshError } from '@docx-editor.dev/core/editor';
+import { DocumentRefreshState } from '@docx-editor.dev/core/editor';
 import { DocumentSource } from '@docx-editor.dev/core/contracts/editor';
 import * as _docx_editor_dev_core from '@docx-editor.dev/core';
 import * as _docx_editor_dev_i18n from '@docx-editor.dev/i18n';
@@ -81,6 +88,7 @@ import { MarkedFontResolver } from '@docx-editor.dev/core/editor';
 import { MAX_RESOLVER_FAMILIES } from '@docx-editor.dev/core/editor';
 import { MaybeRef } from 'vue';
 import { MaybeRefOrGetter as MaybeRefOrGetter_2 } from 'vue';
+import { NavigateToChangeOptions } from '@docx-editor.dev/core/editor';
 import { NavigationCommand } from '@docx-editor.dev/core/editor';
 import { PageSetup } from '@docx-editor.dev/core/contracts/editor';
 import { PaginatedSurfaceState } from '@docx-editor.dev/core/editor';
@@ -94,6 +102,15 @@ import { PropType } from 'vue';
 import { PX_PER_CM } from '@docx-editor.dev/core/editor';
 import { PX_PER_INCH } from '@docx-editor.dev/core/editor';
 import { Ref } from 'vue';
+import { RefreshChange } from '@docx-editor.dev/core/editor';
+import { RefreshChangeInput } from '@docx-editor.dev/core/editor';
+import { RefreshFailureCode } from '@docx-editor.dev/core/editor';
+import { RefreshHighlightAnimation } from '@docx-editor.dev/core/editor';
+import { RefreshHighlightOptions } from '@docx-editor.dev/core/editor';
+import { RefreshLocation } from '@docx-editor.dev/core/editor';
+import { RefreshResult } from '@docx-editor.dev/core/editor';
+import { RefreshSubmission } from '@docx-editor.dev/core/editor';
+import { RefreshUpdate } from '@docx-editor.dev/core/editor';
 import { ReviewAuthorInfo } from '@docx-editor.dev/core/editor';
 import { RevisionAuthorAssignments } from '@docx-editor.dev/core/editor';
 import { RevisionAuthorStyle } from '@docx-editor.dev/core/editor';
@@ -132,6 +149,10 @@ export { CHROME_GROUPS }
 
 export { CHROME_MENUS }
 
+export { ChromeExportFormat }
+
+export { ChromeExportHandlers }
+
 export { ChromeMenu }
 
 export { ChromeMenuEntry }
@@ -150,6 +171,8 @@ export { ChromeSlotId }
 
 // @public (undocumented)
 export type ChromeTranslate = (key: string, params?: Record<string, string | number>) => string;
+
+export { ClearRefreshHighlightsOptions }
 
 export { commandForSlot }
 
@@ -2037,6 +2060,8 @@ export interface ContextMenuTableRowProps extends ContextMenuCommandProps {
     destructive?: boolean;
 }
 
+export { createDocumentRefresh }
+
 export { createFontSource }
 
 export { defineFontResolver }
@@ -2166,6 +2191,12 @@ export const DocumentOutline: vue.DefineComponent<vue.ExtractPropTypes<{
     scrollLeft: number;
     topOffset: number;
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
+export { DocumentRefresh }
+
+export { DocumentRefreshError }
+
+export { DocumentRefreshState }
 
 export { DocxDocument }
 
@@ -2496,6 +2527,69 @@ export interface DocxEditorDocumentOutlineProps {
 export const DocxEditorEquation: vue.DefineComponent<{}, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
     [key: string]: any;
 }> | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<{}> & Readonly<{}>, {}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
+// @public
+export const DocxEditorExportDialog: vue.DefineComponent<vue.ExtractPropTypes<{
+    children: PropType<DocxEditorChildren>;
+    className: StringConstructor;
+    error: {
+        required: true;
+        type: StringConstructor;
+    };
+    format: {
+        required: true;
+        type: PropType<ChromeExportFormat>;
+    };
+    onClose: {
+        required: true;
+        type: PropType<() => void>;
+    };
+    open: {
+        required: true;
+        type: BooleanConstructor;
+    };
+    pending: {
+        required: true;
+        type: BooleanConstructor;
+    };
+    style: PropType<CSSProperties>;
+}>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    children: PropType<DocxEditorChildren>;
+    className: StringConstructor;
+    error: {
+        required: true;
+        type: StringConstructor;
+    };
+    format: {
+        required: true;
+        type: PropType<ChromeExportFormat>;
+    };
+    onClose: {
+        required: true;
+        type: PropType<() => void>;
+    };
+    open: {
+        required: true;
+        type: BooleanConstructor;
+    };
+    pending: {
+        required: true;
+        type: BooleanConstructor;
+    };
+    style: PropType<CSSProperties>;
+}>> & Readonly<{}>, {}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
+// @public
+export interface DocxEditorExportDialogProps {
+    children?: DocxEditorChildren;
+    className?: string;
+    error: string;
+    format: ChromeExportFormat;
+    onClose(): void;
+    open: boolean;
+    pending: boolean;
+    style?: CSSProperties;
+}
 
 // @public (undocumented)
 export const DocxEditorFontNotice: vue.DefineComponent<vue.ExtractPropTypes<{
@@ -2841,6 +2935,10 @@ export interface DocxEditorMenuNamespace {
     // (undocumented)
     readonly Entry: typeof MenuEntry;
     // (undocumented)
+    readonly ExportMarkdown: typeof MenuExportMarkdown;
+    // (undocumented)
+    readonly ExportPdf: typeof MenuExportPdf;
+    // (undocumented)
     readonly File: MenuPartComponent;
     // (undocumented)
     readonly Format: MenuPartComponent;
@@ -2860,6 +2958,8 @@ export interface DocxEditorMenuNamespace {
     readonly Open: typeof MenuOpen;
     // (undocumented)
     readonly PageSetup: typeof MenuPageSetup;
+    // (undocumented)
+    readonly Print: typeof MenuPrint;
     // (undocumented)
     readonly ReportIssue: typeof MenuReportIssue;
     // (undocumented)
@@ -2884,6 +2984,7 @@ export interface DocxEditorMenuProps {
     children?: DocxEditorChildren;
     // (undocumented)
     className?: string;
+    exporters?: ChromeExportHandlers;
     // (undocumented)
     fileName?: string;
     // (undocumented)
@@ -2922,6 +3023,7 @@ export interface DocxEditorNamespace {
     // (undocumented)
     readonly DocumentOutline: typeof DocxEditorDocumentOutline;
     readonly Equation: typeof DocxEditorEquation;
+    readonly ExportDialog: typeof DocxEditorExportDialog;
     // (undocumented)
     readonly FontNotice: typeof DocxEditorFontNotice;
     // (undocumented)
@@ -2955,6 +3057,7 @@ export interface DocxEditorNamespace {
     // (undocumented)
     readonly PageSetupDialog: typeof DocxEditorPageSetupDialog;
     readonly ParagraphDialog: typeof DocxEditorParagraphDialog;
+    readonly PrintDialog: typeof DocxEditorPrintDialog;
     // (undocumented)
     readonly Root: typeof DocxEditorRoot;
     // (undocumented)
@@ -3365,7 +3468,7 @@ export const DocxEditorPageSetupDialog: {
 }>> & Readonly<{}>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, {
     className: string;
     preset: boolean;
-}, {}, string, {}, vue.GlobalComponents, vue.GlobalDirectives, string, vue.ComponentProvideOptions> & vue.VNodeProps & vue.AllowedComponentProps & vue.ComponentCustomProps & Record<"Header" | "Footer" | "Title" | "Cancel" | "Apply" | "Error" | "Body", vue.DefineComponent<DialogPartProps>> & {
+}, {}, string, {}, vue.GlobalComponents, vue.GlobalDirectives, string, vue.ComponentProvideOptions> & vue.VNodeProps & vue.AllowedComponentProps & vue.ComponentCustomProps & Record<"Header" | "Footer" | "Title" | "Cancel" | "Apply" | "Body" | "Error", vue.DefineComponent<DialogPartProps>> & {
     Field: vue.DefineComponent<DialogPartProps & {
         name: "scope" | "orientation" | "pageSize" | "marginLeft" | "marginRight" | "marginBottom" | "marginTop";
     }>;
@@ -3458,7 +3561,7 @@ export const DocxEditorParagraphDialog: {
 }>> & Readonly<{}>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, {
     className: string;
     preset: boolean;
-}, {}, string, {}, vue.GlobalComponents, vue.GlobalDirectives, string, vue.ComponentProvideOptions> & vue.VNodeProps & vue.AllowedComponentProps & vue.ComponentCustomProps & Record<"Header" | "Footer" | "Title" | "Cancel" | "Apply" | "Error" | "Body", vue.DefineComponent<DialogPartProps>> & {
+}, {}, string, {}, vue.GlobalComponents, vue.GlobalDirectives, string, vue.ComponentProvideOptions> & vue.VNodeProps & vue.AllowedComponentProps & vue.ComponentCustomProps & Record<"Header" | "Footer" | "Title" | "Cancel" | "Apply" | "Body" | "Error", vue.DefineComponent<DialogPartProps>> & {
     Field: vue.DefineComponent<DialogPartProps & {
         name: "keepNext" | "keepLines" | "pageBreakBefore" | "widowControl" | "contextualSpacing" | "alignment" | "spaceBefore" | "spaceAfter" | "lineRule" | "tabStops" | "special" | "indentLeft" | "indentRight" | "specialBy" | "lineValue";
     }>;
@@ -3487,6 +3590,7 @@ export interface DocxEditorPopups {
     contextMenu?: DocxEditorPopup<DocxEditorContextMenuProps>;
     // (undocumented)
     equation?: DocxEditorPopup<Record<string, never>>;
+    export?: DocxEditorPopup<DocxEditorExportDialogProps>;
     // (undocumented)
     hyperlink?: DocxEditorPopup<HyperLinkProps>;
     // (undocumented)
@@ -3505,8 +3609,72 @@ export interface DocxEditorPopups {
     pageSetup?: DocxEditorPopup<DocxEditorPageSetupDialogProps>;
     // (undocumented)
     paragraph?: DocxEditorPopup<DocxEditorParagraphDialogProps>;
+    print?: DocxEditorPopup<DocxEditorPrintDialogProps>;
     // (undocumented)
     textFormField?: DocxEditorPopup<DocxEditorTextFormFieldDialogProps>;
+}
+
+// @public
+export const DocxEditorPrintDialog: vue.DefineComponent<vue.ExtractPropTypes<{
+    children: PropType<DocxEditorChildren>;
+    className: StringConstructor;
+    error: {
+        required: true;
+        type: StringConstructor;
+    };
+    onClose: {
+        required: true;
+        type: PropType<() => void>;
+    };
+    open: {
+        required: true;
+        type: BooleanConstructor;
+    };
+    pending: {
+        required: true;
+        type: BooleanConstructor;
+    };
+    style: PropType<CSSProperties>;
+    url: {
+        required: true;
+        type: StringConstructor;
+    };
+}>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+    children: PropType<DocxEditorChildren>;
+    className: StringConstructor;
+    error: {
+        required: true;
+        type: StringConstructor;
+    };
+    onClose: {
+        required: true;
+        type: PropType<() => void>;
+    };
+    open: {
+        required: true;
+        type: BooleanConstructor;
+    };
+    pending: {
+        required: true;
+        type: BooleanConstructor;
+    };
+    style: PropType<CSSProperties>;
+    url: {
+        required: true;
+        type: StringConstructor;
+    };
+}>> & Readonly<{}>, {}, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
+
+// @public
+export interface DocxEditorPrintDialogProps {
+    children?: DocxEditorChildren;
+    className?: string;
+    error: string;
+    onClose(): void;
+    open: boolean;
+    pending: boolean;
+    style?: CSSProperties;
+    url: string;
 }
 
 // @public
@@ -3798,7 +3966,7 @@ export const DocxEditorTextFormFieldDialog: {
 }>> & Readonly<{}>, () => vue_jsx_runtime.JSX.Element | null, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, {}, string, {
     preset: boolean;
     session: TextFormFieldDialogSession | null;
-}, {}, string, {}, vue.GlobalComponents, vue.GlobalDirectives, string, vue.ComponentProvideOptions> & vue.VNodeProps & vue.AllowedComponentProps & vue.ComponentCustomProps & Record<"Header" | "Footer" | "Title" | "Cancel" | "Apply" | "Error" | "Body", vue.DefineComponent<DialogPartProps>> & {
+}, {}, string, {}, vue.GlobalComponents, vue.GlobalDirectives, string, vue.ComponentProvideOptions> & vue.VNodeProps & vue.AllowedComponentProps & vue.ComponentCustomProps & Record<"Header" | "Footer" | "Title" | "Cancel" | "Apply" | "Body" | "Error", vue.DefineComponent<DialogPartProps>> & {
     Field: vue.DefineComponent<DialogPartProps & {
         name: keyof TextFormFieldDialogFields;
     }>;
@@ -4707,6 +4875,8 @@ export interface MenuTableGridProps {
     slot?: ChromeSlotId;
 }
 
+export { NavigateToChangeOptions }
+
 // @public
 export const NAVIGATION_PANE_GAP = 16;
 
@@ -5416,6 +5586,24 @@ export interface ProvideDocxEditorResult {
 export { PX_PER_CM }
 
 export { PX_PER_INCH }
+
+export { RefreshChange }
+
+export { RefreshChangeInput }
+
+export { RefreshFailureCode }
+
+export { RefreshHighlightAnimation }
+
+export { RefreshHighlightOptions }
+
+export { RefreshLocation }
+
+export { RefreshResult }
+
+export { RefreshSubmission }
+
+export { RefreshUpdate }
 
 // @public
 export const REVIEW_MARKERS_GUTTER = 44;

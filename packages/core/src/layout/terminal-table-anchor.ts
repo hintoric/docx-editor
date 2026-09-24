@@ -14,6 +14,7 @@ import { stripAnchorSinksForProbe } from './table-probe-deps.ts';
 import type { StyleCascadeTable } from './style-cascade.ts';
 import type { RevisionAuthorFilter, RevisionDisplayMode } from './revision-projection.ts';
 import type { TableFragmentRecord } from './semantic-records.ts';
+import type { PositionedTableAnchor } from './table-float-position.ts';
 
 const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const MAX_TERMINAL_TABLES = 32;
@@ -83,8 +84,19 @@ function emptyAnchor(block: Block): boolean {
   return true;
 }
 
+/** Per immutable table node: every section prepass asks it of the tables before its anchor. */
+const simpleTables = new WeakMap<OoxmlElement, boolean>();
+
 /** Keep the admission probe and the final placement on the same simple-row path. */
 function simpleTable(table: OoxmlElement): boolean {
+  const cached = simpleTables.get(table);
+  if (cached !== undefined) return cached;
+  const simple = simpleTableUncached(table);
+  simpleTables.set(table, simple);
+  return simple;
+}
+
+function simpleTableUncached(table: OoxmlElement): boolean {
   const pending = [table];
   let visits = 0;
   while (pending.length) {
@@ -211,6 +223,26 @@ export interface TerminalTablePlacement {
   readonly fragments: readonly TableFragmentRecord[];
   readonly bottom: number;
   readonly cellBreakKeys: readonly (readonly string[])[];
+}
+
+/** Attach each placed table's logical-anchor wrap metadata. */
+export function withTerminalFloatingWrap(
+  fragments: readonly TableFragmentRecord[],
+  positioned: readonly PositionedTableAnchor[],
+  columnIndex: number
+): TableFragmentRecord[] {
+  return fragments.map((fragment) => {
+    const source = positioned.find((entry) => entry.table.id === fragment.tableId)!;
+    return {
+      ...fragment,
+      floatingWrap: {
+        anchorId: source.anchorId,
+        columnIndex,
+        float: source.float,
+        sourceOrder: source.sourceIndex,
+      },
+    };
+  });
 }
 
 /** Decline the whole group unless its table/anchor union fits this content rectangle. */

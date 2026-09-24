@@ -601,6 +601,27 @@ export const CHROME_GROUPS: readonly [{
             readonly kind: "save";
         };
     }, {
+        readonly id: "exportMarkdown";
+        readonly labelKey: "toolbar.exportMarkdown";
+        readonly paths: readonly string[];
+        readonly state: {
+            readonly kind: "export";
+        };
+    }, {
+        readonly id: "exportPdf";
+        readonly labelKey: "toolbar.exportPdf";
+        readonly paths: readonly string[];
+        readonly state: {
+            readonly kind: "export";
+        };
+    }, {
+        readonly id: "print";
+        readonly labelKey: "toolbar.print";
+        readonly paths: readonly string[];
+        readonly state: {
+            readonly kind: "export";
+        };
+    }, {
         readonly id: "pageSetup";
         readonly labelKey: "toolbar.pageSetup";
         readonly paths: readonly string[];
@@ -754,7 +775,43 @@ export type ChromeControlState =
 */
 | {
     readonly kind: 'load';
+}
+/** Host conversion through `runChromeExport` or `runChromePrint`; not an editing command. */
+| {
+    readonly kind: 'export';
 };
+
+// @public
+export class ChromeExportError extends Error {
+    constructor(format: ChromeExportFormat);
+    // (undocumented)
+    readonly code = "missing-exporter";
+    // (undocumented)
+    readonly format: ChromeExportFormat;
+}
+
+// @public
+export type ChromeExportFormat = 'markdown' | 'pdf';
+
+// @public
+export interface ChromeExportHandlers {
+    readonly markdown?: (source: Uint8Array) => Promise<{
+        readonly markdown: string;
+    }>;
+    readonly pdf?: (source: Uint8Array) => Promise<{
+        readonly bytes: Uint8Array;
+    }>;
+}
+
+// @public
+export interface ChromeExportResult {
+    // (undocumented)
+    readonly bytes: Uint8Array;
+    // (undocumented)
+    readonly extension: 'md' | 'pdf';
+    // (undocumented)
+    readonly mimeType: string;
+}
 
 // @public
 export interface ChromeGroup<Id extends string = string, ControlId extends string = string> {
@@ -818,10 +875,31 @@ export interface ChromeMenuSubmenuEntry {
 }
 
 // @public
+export class ChromePrintError extends Error {
+    constructor(code: ChromePrintErrorCode);
+    readonly code: ChromePrintErrorCode;
+}
+
+// @public
+export type ChromePrintErrorCode = 'pdf-viewer-unavailable' | 'pdf-load-failed' | 'print-refused' | 'print-ended';
+
+// @public
+export interface ChromePrintJob {
+    dispose(): void;
+    print(options?: ChromePrintOptions): Promise<void>;
+    readonly url: string;
+}
+
+// @public
+export interface ChromePrintOptions {
+    readonly beforePrint?: () => void | Promise<void>;
+}
+
+// @public
 export function chromeProbeForSlot(slotId: ChromeSlotId): EditorCommand | null;
 
 // @public
-export type ChromeSlotId = 'history.undo' | 'history.redo' | 'zoom.level' | 'styles.style' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'script.super' | 'script.sub' | 'alignment.left' | 'alignment.center' | 'alignment.right' | 'alignment.justify' | 'list.bullet' | 'list.numbered' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'format.painter' | 'format.clear' | 'review.comments' | 'review.paragraphMarks' | 'review.protectDocument' | 'review.simpleMarkup' | 'review.allMarkup' | 'review.noMarkup' | 'review.original' | 'review.previousChange' | 'review.nextChange' | 'review.acceptAllChanges' | 'review.rejectAllChanges' | 'review.authors' | 'review.editingMode' | 'contentControl.showAll' | 'contentControl.formFill' | 'contentControl.inspector' | 'contentControl.remove' | 'image.insert' | 'image.properties' | 'image.wrap' | 'image.altText' | 'table.insert' | 'table.borderTarget' | 'table.borderColor' | 'table.borderStyle' | 'table.borderWidth' | 'table.cellFill' | 'file.open' | 'file.save' | 'paragraph.dialog' | 'file.pageSetup' | 'insert.footnote' | 'insert.endnote' | 'insert.pageNumber' | 'insert.totalPages' | 'insert.sectionPages' | 'insert.pageXofY' | 'insert.pageBreak' | 'insert.sectionBreakNextPage' | 'insert.sectionBreakContinuous' | 'insert.toc';
+export type ChromeSlotId = 'history.undo' | 'history.redo' | 'zoom.level' | 'styles.style' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'script.super' | 'script.sub' | 'alignment.left' | 'alignment.center' | 'alignment.right' | 'alignment.justify' | 'list.bullet' | 'list.numbered' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'format.painter' | 'format.clear' | 'review.comments' | 'review.paragraphMarks' | 'review.protectDocument' | 'review.simpleMarkup' | 'review.allMarkup' | 'review.noMarkup' | 'review.original' | 'review.previousChange' | 'review.nextChange' | 'review.acceptAllChanges' | 'review.rejectAllChanges' | 'review.authors' | 'review.editingMode' | 'contentControl.showAll' | 'contentControl.formFill' | 'contentControl.inspector' | 'contentControl.remove' | 'image.insert' | 'image.properties' | 'image.wrap' | 'image.altText' | 'table.insert' | 'table.borderTarget' | 'table.borderColor' | 'table.borderStyle' | 'table.borderWidth' | 'table.cellFill' | 'file.open' | 'file.save' | 'file.exportMarkdown' | 'file.exportPdf' | 'file.print' | 'paragraph.dialog' | 'file.pageSetup' | 'insert.footnote' | 'insert.endnote' | 'insert.pageNumber' | 'insert.totalPages' | 'insert.sectionPages' | 'insert.pageXofY' | 'insert.pageBreak' | 'insert.sectionBreakNextPage' | 'insert.sectionBreakContinuous' | 'insert.toc';
 
 // @public
 export function chromeSlotId(group: {
@@ -832,6 +910,11 @@ export function chromeSlotId(group: {
 
 // @public
 export function chromeSlotIsToggle(slotId: ChromeSlotId): boolean;
+
+// @public
+export interface ClearRefreshHighlightsOptions {
+    readonly animation?: boolean | RefreshHighlightAnimation;
+}
 
 // @internal
 export function clipboardDropLandsText(transfer: DataTransfer | null | undefined): boolean;
@@ -961,6 +1044,9 @@ export function createBrowserAutomationHost(editor: DocxEditorInstance): Automat
 export function createContentControlListNavigation(locale?: string): ContentControlListNavigation;
 
 // @public
+export function createDocumentRefresh(editor: DocxEditorInstance): DocumentRefresh;
+
+// @public
 export function createDocxEditor(config: DocxEditorConfig): DocxEditorInstance;
 
 // @public
@@ -1029,6 +1115,40 @@ export function defineFontResolver<T extends FontResolver>(resolve: T): MarkedFo
 
 // @public
 export function disposeLayoutShaping(shaping: LayoutShapingOptions): void;
+
+// @public
+export interface DocumentRefresh {
+    applyUpdate(update: RefreshUpdate): Promise<RefreshResult>;
+    cancel(): void;
+    capture(): Promise<RefreshSubmission>;
+    clearHighlights(options?: ClearRefreshHighlightsOptions): void;
+    finish(submission: RefreshSubmission): void;
+    highlightChanges(options?: RefreshHighlightOptions): number;
+    navigateToChange(id: string, options?: NavigateToChangeOptions): boolean;
+    onResult(listener: (result: RefreshResult) => void): () => void;
+    recover(): Promise<boolean>;
+    recoveryBytes(): ArrayBuffer | null;
+    snapshot(): DocumentRefreshState;
+    subscribe(listener: () => void): () => void;
+}
+
+// @public
+export class DocumentRefreshError extends Error {
+    constructor(code: RefreshFailureCode, cause?: unknown);
+    readonly code: RefreshFailureCode;
+}
+
+// @public
+export interface DocumentRefreshState {
+    // (undocumented)
+    readonly changes: readonly RefreshChange[];
+    readonly highlightsVisible: boolean;
+    // (undocumented)
+    readonly phase: 'idle' | 'capturing' | 'processing' | 'refreshing' | 'recovering' | 'complete' | 'failed';
+    readonly recoveryAvailable: boolean;
+    // (undocumented)
+    readonly result: RefreshResult | null;
+}
 
 // @public
 export interface DocxEditorConfig {
@@ -1529,6 +1649,9 @@ export interface InvalidTextFormFieldSession {
 }
 
 // @public
+export function isChromePrintShortcut(event: KeyboardEvent): boolean;
+
+// @public
 export function isFontResolver(value: unknown): value is MarkedFontResolver;
 
 // @public
@@ -1584,6 +1707,14 @@ export function mixedFieldsOf(format: ParagraphFormatRead): ParagraphDialogMixed
 
 // @public
 export function mountPaginatedSurface(container: HTMLElement, bytes: Uint8Array, options?: PaginatedSurfaceOptions): OpenPaginatedResult;
+
+// @public
+export interface NavigateToChangeOptions {
+    readonly behavior?: 'instant' | 'smooth';
+    readonly block?: 'start' | 'center' | 'centerIfNeeded' | 'nearest';
+    readonly focus?: boolean;
+    readonly offsetPx?: number;
+}
 
 // @public
 export type NavigationCommand = 'left' | 'right' | 'up' | 'down' | 'wordLeft' | 'wordRight' | 'lineStart' | 'lineEnd' | 'documentStart' | 'documentEnd' | 'pageUp' | 'pageDown';
@@ -2172,6 +2303,97 @@ export const PX_PER_CM: number;
 export const PX_PER_INCH = 96;
 
 // @public
+export interface RefreshChange {
+    // (undocumented)
+    readonly id: string;
+    readonly isNew: boolean;
+    // (undocumented)
+    readonly location?: RefreshLocation;
+    readonly resultId: string;
+    // (undocumented)
+    readonly status: 'available' | 'deleted' | 'unavailable' | 'invalid' | 'unsupported-story';
+}
+
+// @public
+export interface RefreshChangeInput {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly location?: RefreshLocation;
+    readonly unavailableReason?: 'deleted' | 'unavailable';
+}
+
+// @public
+export type RefreshFailureCode = 'unavailable' | 'collaboration' | 'busy' | 'cancelled' | 'superseded' | 'document-changed' | 'local-edits' | 'out-of-order' | 'invalid-result' | 'invalid-document' | 'input-failed' | 'load-failed' | 'recovery-failed';
+
+// @public
+export interface RefreshHighlightAnimation {
+    readonly durationMs?: number;
+    readonly easing?: string;
+    readonly exitDurationMs?: number;
+}
+
+// @public
+export interface RefreshHighlightOptions {
+    readonly animation?: boolean | RefreshHighlightAnimation;
+    readonly borderColor?: string;
+    readonly borderRadius?: number;
+    readonly borderStyle?: 'solid' | 'dashed' | 'dotted';
+    readonly borderWidth?: number;
+    readonly changeIds?: readonly string[];
+    readonly className?: string;
+    readonly color?: string;
+    readonly includePrevious?: boolean;
+    readonly opacity?: number;
+    readonly padding?: number;
+    readonly timeoutMs?: number | null;
+}
+
+// @public
+export interface RefreshLocation {
+    // (undocumented)
+    readonly end: number;
+    readonly paragraphId?: string;
+    readonly paragraphIndex?: number;
+    readonly start: number;
+    readonly text: string;
+}
+
+// @public
+export type RefreshResult = {
+    readonly changeInformation: 'available' | 'unavailable';
+    readonly changes: readonly RefreshChange[];
+    readonly failures: readonly string[];
+    readonly ok: true;
+    readonly resultId: string;
+} | {
+    readonly code: RefreshFailureCode;
+    readonly ok: false;
+    readonly recovered?: boolean;
+    readonly resultId: string;
+};
+
+// @public
+export interface RefreshSubmission {
+    // (undocumented)
+    readonly bytes: ArrayBuffer;
+    // (undocumented)
+    readonly id: string;
+}
+
+// @public
+export interface RefreshUpdate {
+    // (undocumented)
+    readonly bytes: ArrayBuffer | Uint8Array;
+    readonly changes?: readonly RefreshChangeInput[];
+    readonly failures?: readonly string[];
+    // (undocumented)
+    readonly sequence: number;
+    // (undocumented)
+    readonly submission: RefreshSubmission;
+}
+
+// @public
 export interface RemoteCaretLabelAnchor {
     // (undocumented)
     readonly element: HTMLElement;
@@ -2320,6 +2542,12 @@ export interface RulerTick {
 
 // @public
 export type RulerUnit = 'inch' | 'cm';
+
+// @public
+export function runChromeExport(editor: Pick<Editor, 'save'>, format: ChromeExportFormat, handlers?: ChromeExportHandlers): Promise<ChromeExportResult>;
+
+// @public
+export function runChromePrint(editor: Pick<Editor, 'save'>, handlers?: ChromeExportHandlers, container?: Document | Element): Promise<ChromePrintJob>;
 
 // @public
 export function runSave(editor: Editor | null): Promise<ArrayBuffer>;

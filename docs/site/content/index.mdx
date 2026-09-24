@@ -20,8 +20,8 @@ It parses Office Open XML (OOXML), renders paginated pages, and saves the edited
   <Card title="Review document fidelity" href="/docs/2.x/word-fidelity">
     Check feature support, round-trip behavior, security, and limits.
   </Card>
-  <Card title="Build a DOCX agent" href="/docs/2.x/build-a-docx-agent">
-    Define tools a model can call to read, draft, and redline a DOCX.
+  <Card title="Connect an agent to a document" href="/docs/2.x/build-a-docx-agent">
+    Choose how an agent edits a DOCX and how readers see its updates.
   </Card>
 </Cards>
 
@@ -33,16 +33,22 @@ It parses Office Open XML (OOXML), renders paginated pages, and saves the edited
 | [`@docx-editor.dev/vue`](/docs/2.x/vue) | Vue 3 adapter and composables | Apache 2.0 |
 | [`@docx-editor.dev/core`](/docs/2.x/core) | Framework-independent OOXML, document, layout, paint, and editor engine | Apache 2.0 |
 | [`@docx-editor.dev/editor-api`](/docs/2.x/editor-api) | Browser and server automation through a documented Office.js-compatible subset | EigenPal Pro License |
+| [`@docx-editor.dev/docx-to-markdown`](/docs/2.x/export/markdown) | DOCX to Markdown conversion with pages and media | Apache 2.0 |
+| [`@docx-editor.dev/docx-to-pdf`](/docs/2.x/export/pdf) | DOCX to PDF conversion on Node.js | EigenPal Pro License |
 | [`@docx-editor.dev/pro`](/docs/2.x/pro) | Tracked changes, comments, and custom nodes | EigenPal Pro License |
 | [`@docx-editor.dev/i18n`](/docs/2.x/i18n) | Shared interface translations | Apache 2.0 |
 | [`@docx-editor.dev/fonts`](/docs/2.x/guides/fonts) | Open-licensed substitutes for common Word fonts | Apache-2.0 AND OFL-1.1 AND LicenseRef-GUST-Font-License |
 
-The Pro packages are licensed under the EigenPal Pro License, and you can compare and buy license and support levels on the [pricing page](https://www.docx-editor.dev/pricing).
+Compare EigenPal Pro License and support options on the [pricing page](https://www.docx-editor.dev/pricing).
+
+The Nuxt module is a private workspace package. For external applications, follow the [Nuxt guide](/docs/2.x/frameworks/nuxt).
 
 ## Select packages
 
 | Goal | Packages |
 | --- | --- |
+| Convert DOCX to Markdown | `@docx-editor.dev/docx-to-markdown` and `@docx-editor.dev/core` |
+| Convert DOCX to PDF on Node.js | `@docx-editor.dev/docx-to-pdf` and `@docx-editor.dev/core` |
 | React editor | `@docx-editor.dev/react` and `@docx-editor.dev/core` |
 | Vue editor | `@docx-editor.dev/vue` and `@docx-editor.dev/core` |
 | Tracked changes, comments, or custom nodes | Add `@docx-editor.dev/pro` |
@@ -85,7 +91,7 @@ For the preservation contract and test method, see [Word fidelity](/docs/2.x/wor
 ## Next steps
 
 - [Quickstart](/docs/2.x/quickstart): Load, edit, and save a DOCX file.
-- [Build a DOCX agent](/docs/2.x/build-a-docx-agent): Define document tools for a model.
+- [Connect an agent to a document](/docs/2.x/build-a-docx-agent): Choose an integration approach and show agent updates.
 - [Installation](/docs/2.x/installation): Configure supported frameworks.
 - [React composition](/docs/2.x/react/composition): Build a React interface.
 - [Vue composition](/docs/2.x/vue/composition): Build a Vue interface.

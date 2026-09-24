@@ -247,6 +247,8 @@
   /* Focus ring & text selection (derived from primary) */
   --doc-focus-ring: rgba(26, 115, 232, 0.4);
   --doc-selection: rgba(26, 115, 232, 0.3);
+  --doc-refresh-highlight-color: #3b82f6;
+  --doc-motion-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 
   /* ----------------------------------------------------------------------
     * Chrome layering.
@@ -2078,6 +2080,12 @@ a.docx-hyperlink:focus-visible {
 
 /* Scroll container. The host reports scrollTop/scrollLeft to the engine as
  * InteractionHostMetrics.scrollOffset — the engine never reads the DOM. */
+.docx-editor-one-surface__viewport:focus-visible,
+.docx-editor .docx-ruler-marker:focus-visible {
+  outline: 2px solid var(--doc-focus-ring);
+  outline-offset: -2px;
+}
+
 .docx-editor-one-surface__viewport {
   position: relative;
   overflow: auto;
@@ -7423,4 +7431,60 @@ a.docx-hyperlink:focus-visible {
 .docx-editor [data-docx-field]:has(> select[data-docx-form-dropdown]:focus-visible) {
   outline: 2px solid var(--doc-primary);
   outline-offset: 2px;
+}
+
+/* Keep dark document text legible beneath decorative change overlays. */
+:where(.docx-editor) [data-docx-refresh-highlight] {
+  mix-blend-mode: multiply;
+}
+
+.docx-editor .docx-export-dialog,
+.docx-editor.docx-export-dialog {
+  max-width: 380px;
+}
+.docx-editor .docx-export-dialog__progress {
+  display: flex;
+  justify-content: center;
+  margin: 4px 0 16px;
+}
+.docx-editor .docx-export-dialog--pending,
+.docx-editor.docx-export-dialog--pending {
+  text-align: center;
+}
+.docx-editor .docx-export-dialog--pending .docx-dialog__footer,
+.docx-editor.docx-export-dialog--pending .docx-dialog__footer {
+  justify-content: center;
+}
+.docx-editor .docx-print-dialog .docx-dialog__footer,
+.docx-editor.docx-print-dialog .docx-dialog__footer {
+  flex-wrap: wrap;
+}
+.docx-editor .docx-print-dialog__open {
+  margin-inline-end: auto;
+  text-decoration: none;
+}
+.docx-editor .docx-export-dialog__message {
+  margin: 0;
+  color: var(--doc-text-muted);
+  overflow-wrap: anywhere;
+}
+.docx-editor .docx-export-dialog__spinner {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  border: 2px solid var(--doc-border);
+  border-top-color: var(--doc-primary);
+  border-radius: 50%;
+  animation: docx-export-spin 0.8s linear infinite;
+}
+@keyframes docx-export-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .docx-editor .docx-export-dialog__spinner {
+    animation: none;
+  }
 }

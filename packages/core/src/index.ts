@@ -143,3 +143,16 @@ export {
   type HistoryGroupBinding,
   type HistoryGroupBindingOptions,
 } from './editor/bind-history-group.ts';
+
+export { runChromeExport, ChromeExportError } from './editor/chrome-export.ts';
+export type {
+  ChromeExportFormat,
+  ChromeExportHandlers,
+  ChromeExportResult,
+} from './editor/chrome-export.ts';
+export { runChromePrint, ChromePrintError, isChromePrintShortcut } from './editor/chrome-print.ts';
+export type {
+  ChromePrintErrorCode,
+  ChromePrintJob,
+  ChromePrintOptions,
+} from './editor/chrome-print.ts';

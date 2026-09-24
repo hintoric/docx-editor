@@ -1,3 +1,5 @@
+import { DocxEditorExportDialog } from '../editor/DocxEditorExportDialog';
+import { DocxEditorPrintDialog } from '../editor/DocxEditorPrintDialog';
 import { DocxEditorNotesContextMenu } from '../editor/note-popup-parts';
 import { DocxEditorNotePreview } from '../editor/note-popup-parts';
 import { DocxEditorNotePropertiesDialog } from '../editor/DocxEditorNotes';
@@ -306,10 +308,9 @@ const DocxEditorFrame = forwardRef<DocxEditorRef, DocxEditorProps>(
         {chrome ? <DocxEditorNotesChrome /> : null}
         <DocxEditorContent />
         {/* The vertical ruler scrolls WITH the document, so unlike its horizontal
-          twin it belongs inside the scroller. aria-hidden: it carries no
-          operable handles, unlike the horizontal one's indent sliders. */}
+          twin it belongs inside the scroller. Its margin handles remain accessible. */}
         {rulers && chrome ? (
-          <div style={VERTICAL_RULER_STYLE} aria-hidden="true">
+          <div style={VERTICAL_RULER_STYLE}>
             <DocxEditorVerticalRuler />
           </div>
         ) : null}
@@ -493,6 +494,10 @@ export interface DocxEditorNamespace extends ForwardRefExoticComponent<
    * default; `navigation={false}` removes it.
    */
   readonly Navigation: typeof DocxEditorNavigationCompound;
+  /** File export progress and errors, configured through popups.export. */
+  readonly ExportDialog: typeof DocxEditorExportDialog;
+  /** File print progress and errors, configured through popups.print. */
+  readonly PrintDialog: typeof DocxEditorPrintDialog;
   /** Page Setup dialog — size, orientation, margins — applied as one undo step. */
   readonly PageSetupDialog: typeof DocxEditorPageSetupDialog;
   /** The Paragraph dialog: alignment, indentation, spacing and the paragraph flags. */
@@ -547,6 +552,8 @@ export const DocxEditor: DocxEditorNamespace = Object.assign(DocxEditorImpl, {
   VerticalRuler: DocxEditorVerticalRuler,
   DocumentOutline: DocxEditorDocumentOutline,
   Navigation: DocxEditorNavigationCompound,
+  ExportDialog: DocxEditorExportDialog,
+  PrintDialog: DocxEditorPrintDialog,
   PageSetupDialog: DocxEditorPageSetupDialog,
   ParagraphDialog: DocxEditorParagraphDialog,
   TextFormFieldDialog: DocxEditorTextFormFieldDialog,

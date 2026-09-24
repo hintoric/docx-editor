@@ -548,6 +548,27 @@ export const CHROME_GROUPS: readonly [{
             readonly kind: "save";
         };
     }, {
+        readonly id: "exportMarkdown";
+        readonly labelKey: "toolbar.exportMarkdown";
+        readonly paths: readonly string[];
+        readonly state: {
+            readonly kind: "export";
+        };
+    }, {
+        readonly id: "exportPdf";
+        readonly labelKey: "toolbar.exportPdf";
+        readonly paths: readonly string[];
+        readonly state: {
+            readonly kind: "export";
+        };
+    }, {
+        readonly id: "print";
+        readonly labelKey: "toolbar.print";
+        readonly paths: readonly string[];
+        readonly state: {
+            readonly kind: "export";
+        };
+    }, {
         readonly id: "pageSetup";
         readonly labelKey: "toolbar.pageSetup";
         readonly paths: readonly string[];
@@ -638,6 +659,38 @@ export const CHROME_GROUPS: readonly [{
 export const CHROME_MENUS: readonly ChromeMenu[];
 
 // @public
+export class ChromeExportError extends Error {
+    constructor(format: ChromeExportFormat);
+    // (undocumented)
+    readonly code = "missing-exporter";
+    // (undocumented)
+    readonly format: ChromeExportFormat;
+}
+
+// @public
+export type ChromeExportFormat = 'markdown' | 'pdf';
+
+// @public
+export interface ChromeExportHandlers {
+    readonly markdown?: (source: Uint8Array) => Promise<{
+        readonly markdown: string;
+    }>;
+    readonly pdf?: (source: Uint8Array) => Promise<{
+        readonly bytes: Uint8Array;
+    }>;
+}
+
+// @public
+export interface ChromeExportResult {
+    // (undocumented)
+    readonly bytes: Uint8Array;
+    // (undocumented)
+    readonly extension: 'md' | 'pdf';
+    // (undocumented)
+    readonly mimeType: string;
+}
+
+// @public
 export interface ChromeMenu {
     // (undocumented)
     readonly entries: readonly ChromeMenuEntry[];
@@ -686,7 +739,28 @@ export interface ChromeMenuSubmenuEntry {
 }
 
 // @public
-export type ChromeSlotId = 'history.undo' | 'history.redo' | 'zoom.level' | 'styles.style' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'script.super' | 'script.sub' | 'alignment.left' | 'alignment.center' | 'alignment.right' | 'alignment.justify' | 'list.bullet' | 'list.numbered' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'format.painter' | 'format.clear' | 'review.comments' | 'review.paragraphMarks' | 'review.protectDocument' | 'review.simpleMarkup' | 'review.allMarkup' | 'review.noMarkup' | 'review.original' | 'review.previousChange' | 'review.nextChange' | 'review.acceptAllChanges' | 'review.rejectAllChanges' | 'review.authors' | 'review.editingMode' | 'contentControl.showAll' | 'contentControl.formFill' | 'contentControl.inspector' | 'contentControl.remove' | 'image.insert' | 'image.properties' | 'image.wrap' | 'image.altText' | 'table.insert' | 'table.borderTarget' | 'table.borderColor' | 'table.borderStyle' | 'table.borderWidth' | 'table.cellFill' | 'file.open' | 'file.save' | 'paragraph.dialog' | 'file.pageSetup' | 'insert.footnote' | 'insert.endnote' | 'insert.pageNumber' | 'insert.totalPages' | 'insert.sectionPages' | 'insert.pageXofY' | 'insert.pageBreak' | 'insert.sectionBreakNextPage' | 'insert.sectionBreakContinuous' | 'insert.toc';
+export class ChromePrintError extends Error {
+    constructor(code: ChromePrintErrorCode);
+    readonly code: ChromePrintErrorCode;
+}
+
+// @public
+export type ChromePrintErrorCode = 'pdf-viewer-unavailable' | 'pdf-load-failed' | 'print-refused' | 'print-ended';
+
+// @public
+export interface ChromePrintJob {
+    dispose(): void;
+    print(options?: ChromePrintOptions): Promise<void>;
+    readonly url: string;
+}
+
+// @public
+export interface ChromePrintOptions {
+    readonly beforePrint?: () => void | Promise<void>;
+}
+
+// @public
+export type ChromeSlotId = 'history.undo' | 'history.redo' | 'zoom.level' | 'styles.style' | 'font.family' | 'font.size' | 'text.bold' | 'text.italic' | 'text.underline' | 'text.strike' | 'text.color' | 'text.highlight' | 'text.link' | 'script.super' | 'script.sub' | 'alignment.left' | 'alignment.center' | 'alignment.right' | 'alignment.justify' | 'list.bullet' | 'list.numbered' | 'list.outdent' | 'list.indent' | 'list.lineSpacing' | 'format.painter' | 'format.clear' | 'review.comments' | 'review.paragraphMarks' | 'review.protectDocument' | 'review.simpleMarkup' | 'review.allMarkup' | 'review.noMarkup' | 'review.original' | 'review.previousChange' | 'review.nextChange' | 'review.acceptAllChanges' | 'review.rejectAllChanges' | 'review.authors' | 'review.editingMode' | 'contentControl.showAll' | 'contentControl.formFill' | 'contentControl.inspector' | 'contentControl.remove' | 'image.insert' | 'image.properties' | 'image.wrap' | 'image.altText' | 'table.insert' | 'table.borderTarget' | 'table.borderColor' | 'table.borderStyle' | 'table.borderWidth' | 'table.cellFill' | 'file.open' | 'file.save' | 'file.exportMarkdown' | 'file.exportPdf' | 'file.print' | 'paragraph.dialog' | 'file.pageSetup' | 'insert.footnote' | 'insert.endnote' | 'insert.pageNumber' | 'insert.totalPages' | 'insert.sectionPages' | 'insert.pageXofY' | 'insert.pageBreak' | 'insert.sectionBreakNextPage' | 'insert.sectionBreakContinuous' | 'insert.toc';
 
 // @public
 export type CollectReviewItems = (input: ReviewModelInput) => readonly ReviewItem[];
@@ -1107,6 +1181,7 @@ export interface DocumentChange {
     // (undocumented)
     readonly dirty?: readonly string[];
     readonly revision: number;
+    readonly source?: 'load' | 'refresh' | 'recovery';
 }
 
 // @public
@@ -1381,6 +1456,7 @@ export interface Editor {
     reportCustomNodeDiagnostic(diagnostic: unknown): void;
     retainSelection(): SelectionPin | null;
     save(): Promise<ArrayBuffer>;
+    scrollToAnchor(anchor: DocAnchor): boolean;
     // (undocumented)
     scrollToBlock(blockId: string): boolean;
     scrollToPage(pageNumber: number): boolean;
@@ -2306,6 +2382,9 @@ export type InteractionOutcome<T> = {
 export type InteractionOutcomeCode = 'pendingLayout' | 'pendingSelection' | 'readOnly' | 'invalidTarget' | 'unsupported';
 
 // @public
+export function isChromePrintShortcut(event: KeyboardEvent): boolean;
+
+// @public
 export function isFontResolver(value: unknown): value is MarkedFontResolver;
 
 // @public
@@ -2777,6 +2856,12 @@ export interface Run {
     // (undocumented)
     readonly text: string;
 }
+
+// @public
+export function runChromeExport(editor: Pick<Editor, 'save'>, format: ChromeExportFormat, handlers?: ChromeExportHandlers): Promise<ChromeExportResult>;
+
+// @public
+export function runChromePrint(editor: Pick<Editor, 'save'>, handlers?: ChromeExportHandlers, container?: Document | Element): Promise<ChromePrintJob>;
 
 // @public
 export interface RunFormatting {

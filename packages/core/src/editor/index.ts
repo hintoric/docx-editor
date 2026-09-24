@@ -412,3 +412,29 @@ export {
   type ToolbarValueSlot,
   type ToolbarSlotValue,
 } from './toolbar-values.ts';
+
+export { createDocumentRefresh, DocumentRefreshError } from './document-refresh.ts';
+export type {
+  DocumentRefresh,
+  DocumentRefreshState,
+  RefreshSubmission,
+  RefreshUpdate,
+  RefreshResult,
+  RefreshFailureCode,
+  RefreshChange,
+  RefreshChangeInput,
+  RefreshLocation,
+  RefreshHighlightOptions,
+  RefreshHighlightAnimation,
+  ClearRefreshHighlightsOptions,
+  NavigateToChangeOptions,
+} from './document-refresh.ts';
+
+export { runChromeExport, ChromeExportError } from './chrome-export.ts';
+export type {
+  ChromeExportFormat,
+  ChromeExportHandlers,
+  ChromeExportResult,
+} from './chrome-export.ts';
+export { runChromePrint, ChromePrintError, isChromePrintShortcut } from './chrome-print.ts';
+export type { ChromePrintErrorCode, ChromePrintJob, ChromePrintOptions } from './chrome-print.ts';

@@ -48,7 +48,8 @@ export type FeatureCategory =
   | 'review'
   | 'fields'
   | 'structure'
-  | 'collaboration';
+  | 'collaboration'
+  | 'export';
 
 export interface WordFeature {
   /** Stable key, e.g. 'images.wmf'. Never rename; gating may reference it. */
@@ -65,6 +66,7 @@ export interface WordFeature {
 }
 
 export const FEATURE_CATEGORY_LABELS: Record<FeatureCategory, string> = {
+  export: 'Export',
   text: 'Text & formatting',
   paragraphs: 'Paragraphs & styles',
   lists: 'Lists & numbering',
@@ -78,6 +80,42 @@ export const FEATURE_CATEGORY_LABELS: Record<FeatureCategory, string> = {
 };
 
 export const wordFeatures: WordFeature[] = [
+  {
+    id: 'export.markdown',
+    name: 'Markdown export',
+    category: 'export',
+    editing: 'none',
+    rendering: 'partial',
+    roundTrip: 'none',
+    tier: 'community',
+    notes:
+      'File > Export downloads continuous Markdown through docx-to-markdown. Configure menu.exporters.markdown. A dismissible dialog shows progress and errors. Customize it with popups.export. Missing handlers show a setup error. Export preserves the source document.',
+    docsLink: '/docs/2.x/guides/export',
+  },
+  {
+    id: 'export.pdf',
+    name: 'PDF export',
+    category: 'export',
+    editing: 'none',
+    rendering: 'partial',
+    roundTrip: 'none',
+    tier: 'premium',
+    notes:
+      'File > Export downloads PDF through docx-to-pdf on Node.js. Configure menu.exporters.pdf. A dismissible dialog shows progress and errors. Customize it with popups.export. Missing handlers show a setup error. Rejects output without a PDF header. PDF conversion requires the EigenPal Pro License.',
+    docsLink: '/docs/2.x/guides/export',
+  },
+  {
+    id: 'export.print',
+    name: 'Printing',
+    category: 'export',
+    editing: 'none',
+    rendering: 'partial',
+    roundTrip: 'none',
+    tier: 'premium',
+    notes:
+      'File > Print converts the document through menu.exporters.pdf and opens the browser print dialog. Press Ctrl+P, or Cmd+P on macOS. A dialog shows progress and errors, and closes when the browser print dialog opens. Customize it with popups.print. Missing handlers show a setup error. Browsers without a PDF viewer get an Open PDF link instead. Printing requires the EigenPal Pro License.',
+    docsLink: '/docs/2.x/guides/print',
+  },
   // --- Text & formatting -----------------------------------------------
   {
     id: 'text.basic-formatting',
@@ -183,7 +221,7 @@ export const wordFeatures: WordFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'The editor does not draw w:vanish runs and gives them no space, so pages break where Word breaks them. The text survives a round trip. There is no "show hidden text" option. A paragraph with a vanished mark still occupies a line.',
+      'The editor does not draw w:vanish runs or give them space, but preserves their text on save. There is no "show hidden text" option. A paragraph with no visible content collapses when its directly hidden mark precedes another paragraph in the same container. Collapsed paragraphs still advance list numbering. Paragraphs with section breaks follow the section layout rules instead. A mark hidden only through a style still occupies a line.',
   },
   {
     id: 'text.math',
@@ -439,7 +477,7 @@ export const wordFeatures: WordFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Rows split mid-content with correct cut borders. Vertically merged cells repaint on continuation pages, like Word. Repeated headers and bounded complete text rows reserve their shared horizontal border before pagination. This boundary adjustment excludes spaced cells, vertical merges, split rows, positioned tables, drawings, nested tables, and vertical text.',
+      'Rows split mid-content with correct cut borders. A row that cannot break across pages moves to the next page, and a row of that kind taller than a page starts on a new page and then splits. Vertically merged cells repaint on continuation pages. Repeated headers and bounded complete text rows reserve their shared horizontal border before pagination. This boundary adjustment excludes spaced cells, vertical merges, split rows, positioned tables, drawings, nested tables, and vertical text.',
   },
   {
     id: 'tables.nested',
@@ -472,7 +510,7 @@ export const wordFeatures: WordFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'An anchored table uses tblpXSpec or tblpX across the text, margin, or page box, and tblpY or tblpYSpec against its vertical anchor. Body text wraps beside supported floating tables and below full-width tables, including authored text distances. Passages of a quarter inch or less remain empty, so captions and headings clear near-full-width tables. Text-anchored tables with numeric vertical offsets move with their following paragraph and do not add table height to paragraph flow. Negative offsets retain their position when clear of preceding text; intersecting tables move below that text. Text-anchored tables taller than a page, marked no-overlap, using vertical alignment, or affected by earlier wrapping objects retain row pagination. Simple terminal empty anchors retain their shared-page layout. Floating-table positioning has no editing UI.',
+      'An anchored table uses tblpXSpec or tblpX across the text, margin, or page box, and tblpY or tblpYSpec against its vertical anchor. Body text wraps beside supported floating tables and below full-width tables, including authored text distances. Passages of a quarter inch or less remain empty, so captions and headings clear near-full-width tables. Text-anchored tables with numeric vertical offsets move with their following paragraph and do not add table height to paragraph flow. Negative offsets retain their position when clear of preceding text; intersecting tables move below that text. Page- and margin-anchored tables that span the text column move to the next page with their following paragraph when earlier text on the page cannot clear them and still leave room for that paragraph. Text-anchored tables taller than a page, marked no-overlap, using vertical alignment, or affected by earlier wrapping objects retain row pagination. Simple terminal empty anchors retain their shared-page layout. Floating-table positioning has no editing UI.',
   },
   {
     id: 'tables.text-direction',
@@ -509,7 +547,7 @@ export const wordFeatures: WordFeature[] = [
     tier: 'community',
     docsLink: '/docs/2.x/guides/images',
     notes:
-      'Nine wrap modes, exclusion reflow, z-order, and drag and resize in both adapters. In-front and behind-text overlays are not cropped by their anchor cell. Authored anchor text distances are preserved. Text clears rectangular gaps narrower than the next glyph. Both share setImageWrapType and toolbarCommandState.',
+      'Nine wrap modes, exclusion reflow, z-order, and drag and resize in both adapters. In-front and behind-text overlays are not cropped by their anchor cell. Authored anchor text distances are preserved. Text clears rectangular gaps narrower than the next glyph. In a table cell, an object with layoutInCell off is placed against the page in compatibility mode 14 or earlier, or when the document declares no mode, and the table rows it touches move below it. In Word 2013 mode and later it stays in the cell, as in Word. Objects that must not overlap move beside each other before they move down. Before Word 2013 mode, header and footer text outside tables does not wrap around the objects in that header or footer. Both share setImageWrapType and toolbarCommandState.',
   },
   {
     id: 'images.bmp-webp',
@@ -627,7 +665,7 @@ export const wordFeatures: WordFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Brightness, contrast, grayscale, and bilevel black-and-white adjustments render in the editor. Image alpha and authored adjustment markup are preserved. The private PDF exporter applies fixed image opacity but reports unsupported color adjustments.',
+      'Brightness, contrast, grayscale, and bilevel black-and-white adjustments render in the editor. Image alpha and authored adjustment markup are preserved. The PDF exporter applies fixed image opacity but reports unsupported color adjustments.',
   },
   {
     id: 'images.effects',
@@ -695,7 +733,7 @@ export const wordFeatures: WordFeature[] = [
     roundTrip: 'full',
     tier: 'community',
     notes:
-      'Page size, orientation, and margins are editable per section or for the whole document, from the Page Setup dialog or a ruler drag. Each section paginates against its own geometry, so a mixed portrait and landscape document renders as Word shows it. You can insert a next-page or a continuous section break; a continuous one keeps the new section on the sheet the previous section ended. Even and odd page break parity and per-section columns are not modelled yet.',
+      'Page size, orientation, and margins are editable per section or for the whole document, from the Page Setup dialog or a ruler drag. Each section uses its own page dimensions and margins for pagination. You can insert a next-page or a continuous section break; a continuous one keeps the new section on the sheet the previous section ended. When a section has other content, the empty paragraph that ends it before a continuous section takes no vertical space. Per-section columns render from w:cols, but column editing controls are unavailable. Even and odd page break parity remains unsupported.',
   },
   {
     id: 'layout.headers-footers',
@@ -1081,6 +1119,18 @@ export const wordFeatures: WordFeature[] = [
       'Searches the body, headers, footers, footnotes, and endnotes, including table cells and saved field results. Find also searches anchored text boxes in the body, headers, and footers. Inline text boxes and text boxes in notes are excluded. Selecting a text-box match selects its drawing; the content remains read-only.',
   },
   {
+    id: 'collab.anchor-navigation',
+    name: 'Scroll to an external paragraph reference',
+    category: 'collaboration',
+    editing: 'partial',
+    rendering: 'partial',
+    roundTrip: 'preserved',
+    tier: 'community',
+    docsLink: '/docs/2.x/core#scroll-to-an-external-paragraph-reference',
+    notes:
+      'The browser Editor accepts DocAnchor values through scrollToAnchor. Paragraph IDs resolve without internal block IDs. Optional search and occurrence locate text within a paragraph. Scrolling preserves selection, focus, editing scope, content, and undo history. Body paragraphs, table cells, block content controls, headers, footers, footnotes, and endnotes are supported. Repeated headers and footers use their first laid-out occurrence. Text boxes and targets without layout positions return false. Invalid, missing, and ambiguous anchors also return false. React and Vue use the same core method.',
+  },
+  {
     id: 'collab.clipboard',
     name: 'Rich copy/paste (HTML clipboard)',
     category: 'collaboration',
@@ -1121,6 +1171,18 @@ export const wordFeatures: WordFeature[] = [
     tier: 'community',
     notes:
       "The default zoom mode is `auto`: it fits the page width between 50% and 100%. A container narrower than a Letter sheet shrinks the document instead of overflowing. Chrome that pads the scroll container, such as the navigation pane or the review rail, recomputes the fit. A host can pin a fixed scale with `zoom` or `zoomMode={{ type: 'fixed' }}`, or ask for uncapped fit-width. The toolbar ladder and the Ctrl+= and Cmd+= shortcuts use the same engine-owned mode.",
+  },
+  {
+    id: 'collab.document-refresh',
+    name: 'Refresh from server updates',
+    category: 'collaboration',
+    editing: 'partial',
+    rendering: 'partial',
+    roundTrip: 'full',
+    tier: 'community',
+    notes:
+      'Accept complete DOCX results in React and Vue without replacing the editor instance. Preserve scroll by default. Reject local edits, stale results, and collaborative sessions. Present temporary paragraph highlights with configurable color, opacity, padding, corners, borders, CSS decoration, and separate entrance and exit fades. Select changes by ID. Auto-dismiss highlights after a configurable timeout and respect reduced motion. Customize scroll alignment, padding, motion, and focus using validated body locations or a registered review module. Reload resets selection and undo history. Arbitrary file comparison and merging are outside this API.',
+    docsLink: '/docs/2.x/guides/document-refresh',
   },
   {
     id: 'collab.agent-tools',
