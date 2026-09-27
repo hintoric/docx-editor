@@ -1,5 +1,11 @@
 # @docx-editor.dev/i18n
 
+## 2.23.0
+
+### Minor Changes
+
+- 5981e48: Add a Spanish (`es`) locale, available as the `es` export and the `@docx-editor.dev/i18n/es` subpath.
+
 ## 2.22.0
 
 ## 2.21.1
